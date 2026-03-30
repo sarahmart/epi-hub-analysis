@@ -17,10 +17,17 @@ class HubConfig:
     target_name: str       # target string in the forecasts, e.g. "wk inc covid hosp"
     season_start: pd.Timestamp
     season_end: pd.Timestamp
-    ensemble_id: str       # model_id of the hub-generated ensemble
-    baseline_id: str       # model_id of the hub-generated baseline
+    ensemble_id: str                          # model_id of the primary hub ensemble
+    baseline_id: str                          # model_id of the hub-generated baseline
+    google_id: str                            # model_id of the Google submission
+    extra_ensemble_ids: tuple[str, ...] = ()  # additional hub-generated ensembles (for Flu)
 
     # Derived paths
+
+    @property
+    def hub_model_ids(self) -> tuple[str, ...]:
+        """All hub-managed model IDs: primary ensemble, baseline, and any extra ensembles."""
+        return (self.ensemble_id, self.baseline_id) + self.extra_ensemble_ids
 
     @property
     def data_dir(self) -> Path:
@@ -61,6 +68,7 @@ COVID_HUB = HubConfig(
     season_end=pd.Timestamp("2026-05-31"),
     ensemble_id="CovidHub-ensemble",
     baseline_id="CovidHub-baseline",
+    google_id="Google_SAI-Ensemble",
 )
 
 RSV_HUB = HubConfig(
@@ -73,6 +81,7 @@ RSV_HUB = HubConfig(
     season_end=pd.Timestamp("2026-05-31"),
     ensemble_id="RSVHub-ensemble",
     baseline_id="RSVHub-baseline",
+    google_id="Google_SAI-RSVEns",
 )
 
 FLU_HUB = HubConfig(
@@ -84,7 +93,14 @@ FLU_HUB = HubConfig(
     season_start=pd.Timestamp("2025-11-22"),
     season_end=pd.Timestamp("2026-05-31"),
     ensemble_id="FluSight-ensemble",
-    baseline_id="FluSight-baseline",
+    baseline_id="FluSight-baseline", # there are also multiple baselines, currently not yet implemented
+    google_id="Google_SAI-FluEns",
+    extra_ensemble_ids=(
+        "FluSight-HJudge_ensemble",
+        "FluSight-lop_norm",
+        "FluSight-trained_mean",
+        # "FluSight-trained_median",
+    ),
 )
 
 HUBS: dict[str, HubConfig] = {
