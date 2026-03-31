@@ -5,10 +5,10 @@ Loader for any Hubverse-format CDC forecast hub (Flu, COVID, RSV).
 Downloads forecast submission CSVs and target-data truth files from GitHub,
 saves them as parquet to the hub-specific data directory.
 
-Usage:
-    python load_hub.py --hub covid
-    python load_hub.py --hub rsv
-    python load_hub.py --hub flu
+Usage (from root dir):
+    python -m src.load_hub --hub covid
+    python -m src.load_hub --hub rsv
+    python -m src.load_hub --hub flu
 """
 
 from __future__ import annotations
@@ -179,6 +179,7 @@ def load_truth(hub: HubConfig, paths: list[str]) -> pd.DataFrame:
             out = out.rename(columns={"date": "target_end_date"})
         else:
             out["target_end_date"] = out["target_end_date"].fillna(out["date"])
+            out = out.drop(columns=["date"])
 
     for col in ["target_end_date", "reference_date"]:
         if col in out.columns:
