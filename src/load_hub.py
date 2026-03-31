@@ -188,7 +188,43 @@ def load_truth(hub: HubConfig, paths: list[str]) -> pd.DataFrame:
     return out
 
 
-def main(hub: HubConfig) -> None:
+def _manifest_path(data_dir: Path, kind: str) -> Path:
+    return data_dir / f"{kind}_manifest.txt"
+
+
+def _load_manifest(path: Path) -> set[str]:
+    if not path.exists():
+        return set()
+    return set(path.read_text().splitlines())
+
+
+def _save_manifest(path: Path, entries: set[str]) -> None:
+    path.write_text("\n".join(sorted(entries)) + "\n")
+
+
+def _bootstrap_forecast_manifest(hub: HubConfig, forecast_paths: list[str]) -> set[str]:
+    """Infer which forecast files are already in the parquet via (reference_date, model_id) pairs."""
+    if not hub.forecasts_path.exists():
+        return set()
+    existing = pd.read_parquet(hub.forecasts_path, columns=["reference_date", "model_id"])
+    loaded = set(
+        zip(
+            pd.to_datetime(existing["reference_date"]).dt.strftime("%Y-%m-%d"),
+            existing["model_id"].astype(str),
+        )
+    )
+    result = set()
+    for path in forecast_paths:
+        ref_date = parse_reference_date_from_filename(path)
+        parts = Path(path).parts
+        model_id = parts[1] if len(parts) >= 2 else None
+        if ref_date is not None and model_id is not None:
+            if (ref_date.strftime("%Y-%m-%d"), model_id) in loaded:
+                result.add(path)
+    return result
+
+
+def main(hub: HubConfig, incremental: bool = False) -> None:
     hub.data_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Hub: {hub.name} ({hub.owner}/{hub.repo})")
@@ -202,23 +238,47 @@ def main(hub: HubConfig) -> None:
     print(f"Found {len(forecast_paths)} forecast files in date window.")
     print(f"Found {len(target_paths)} target-data files.")
 
-    forecasts = load_forecasts(hub, forecast_paths)
-    truth = load_truth(hub, target_paths)
+    if incremental:
+        fcast_mpath = _manifest_path(hub.data_dir, "forecasts")
 
-    print(f"Forecast rows: {len(forecasts):,}")
-    print(f"Truth rows: {len(truth):,}")
+        if not fcast_mpath.exists() and hub.forecasts_path.exists():
+            print("No forecast manifest found; bootstrapping from existing parquet...")
+            forecast_manifest = _bootstrap_forecast_manifest(hub, forecast_paths)
+            _save_manifest(fcast_mpath, forecast_manifest)
+            print(f"Bootstrapped {len(forecast_manifest)} forecast files into manifest.")
+        else:
+            forecast_manifest = _load_manifest(fcast_mpath)
 
-    forecasts.to_parquet(hub.forecasts_path, index=False)
-    truth.to_parquet(hub.truth_path, index=False)
+        new_forecast_paths = [p for p in forecast_paths if p not in forecast_manifest]
+        new_target_paths = target_paths  # always refresh target data
+        print(f"Incremental mode: {len(new_forecast_paths)} new forecast files, {len(new_target_paths)} target-data files (target data always reloaded).")
+    else:
+        forecast_manifest = set()
+        new_forecast_paths = forecast_paths
+        new_target_paths = target_paths
 
-    print(f"Saved forecasts to: {hub.forecasts_path}")
-    print(f"Saved truth to: {hub.truth_path}")
+    if new_forecast_paths:
+        forecasts = load_forecasts(hub, new_forecast_paths)
+        if incremental and hub.forecasts_path.exists():
+            forecasts = pd.concat([pd.read_parquet(hub.forecasts_path), forecasts], ignore_index=True)
+        print(f"Forecast rows: {len(forecasts):,}")
+        forecasts.to_parquet(hub.forecasts_path, index=False)
+        _save_manifest(_manifest_path(hub.data_dir, "forecasts"), forecast_manifest | set(new_forecast_paths))
+        print(f"Saved forecasts to: {hub.forecasts_path}")
+        print("\nForecast columns:")
+        print(sorted(forecasts.columns.tolist()))
+    else:
+        print("No new forecast files to load.")
 
-    print("\nForecast columns:")
-    print(sorted(forecasts.columns.tolist()))
-
-    print("\nTruth columns:")
-    print(sorted(truth.columns.tolist()))
+    if new_target_paths:
+        truth = load_truth(hub, new_target_paths)
+        print(f"Truth rows: {len(truth):,}")
+        truth.to_parquet(hub.truth_path, index=False)
+        print(f"Saved truth to: {hub.truth_path}")
+        print("\nTruth columns:")
+        print(sorted(truth.columns.tolist()))
+    else:
+        print("No new target data files to load.")
 
 
 if __name__ == "__main__":
@@ -229,5 +289,11 @@ if __name__ == "__main__":
         required=True,
         help="Which hub to load: covid | rsv | flu",
     )
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        default=False,
+        help="Only load files not already downloaded; merge with existing parquet.",
+    )
     args = parser.parse_args()
-    main(HUBS[args.hub])
+    main(HUBS[args.hub], incremental=args.incremental)
