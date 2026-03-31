@@ -260,7 +260,10 @@ def main(hub: HubConfig, incremental: bool = False) -> None:
     if new_forecast_paths:
         forecasts = load_forecasts(hub, new_forecast_paths)
         if incremental and hub.forecasts_path.exists():
-            forecasts = pd.concat([pd.read_parquet(hub.forecasts_path), forecasts], ignore_index=True)
+            existing = pd.read_parquet(hub.forecasts_path)
+            if "output_type_id" in existing.columns:
+                existing["output_type_id"] = existing["output_type_id"].astype(str)
+            forecasts = pd.concat([existing, forecasts], ignore_index=True)
         print(f"Forecast rows: {len(forecasts):,}")
         forecasts.to_parquet(hub.forecasts_path, index=False)
         _save_manifest(_manifest_path(hub.data_dir, "forecasts"), forecast_manifest | set(new_forecast_paths))
