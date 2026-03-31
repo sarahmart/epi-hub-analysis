@@ -114,6 +114,69 @@ def score_one_forecast(group: pd.DataFrame) -> pd.Series:
     )
 
 
+def pairwise_relative_wis(scores_df, baseline_model, score_col="wis"):
+    """
+    Pairwise relative WIS following Bracher et al. 2021.
+
+    For each ordered pair of models (i, j):
+      - A_ij = tasks where both i and j submitted (reference_date x horizon x location)
+      - theta_ij = mean_score_i(A_ij) / mean_score_j(A_ij)
+
+    For each model i:
+      - theta_i = geometric mean of {theta_ij} across all j != i
+
+    Final score = theta_i / theta_baseline  (so baseline model gets rel_wis = 1).
+
+    Parameters
+    ----------
+    scores_df      : Per-task scores DataFrame with columns model_id,
+                     reference_date, horizon, location, and score_col.
+    baseline_model : Model ID to use as the scaling reference (rel_wis = 1).
+    score_col      : Score column to use ('wis' or 'log_wis').
+
+    Returns
+    -------
+    DataFrame with columns: model_id, rel_wis
+    """
+    task_key = ["reference_date", "horizon", "location"]
+    models = scores_df["model_id"].unique()
+
+    # Build per-model Series indexed by task tuple for fast intersection
+    model_scores = {}
+    for m, grp in scores_df.groupby("model_id"):
+        model_scores[m] = grp.set_index(task_key)[score_col].dropna()
+
+    # Compute pairwise log-ratios log(theta_ij) for each model i
+    log_ratios = {m: [] for m in models}
+    for i in models:
+        si = model_scores[i]
+        for j in models:
+            if i == j:
+                continue
+            sj = model_scores[j]
+            common = si.index.intersection(sj.index)
+            if len(common) == 0:
+                continue
+            mean_i = si.loc[common].mean()
+            mean_j = sj.loc[common].mean()
+            if mean_i > 0 and mean_j > 0:
+                log_ratios[i].append(np.log(mean_i / mean_j))
+
+    # Geometric mean across all opponents
+    geo_means = {}
+    for m in models:
+        if log_ratios[m]:
+            geo_means[m] = np.exp(np.mean(log_ratios[m]))
+        else:
+            geo_means[m] = float("nan")
+
+    baseline_geo = geo_means.get(baseline_model, float("nan"))
+
+    return pd.DataFrame(
+        [{"model_id": m, "rel_wis": v / baseline_geo} for m, v in geo_means.items()]
+    )
+
+
 def score_hub(hub: HubConfig) -> None:
     print(f"Scoring hub: {hub.name} (target: {hub.target_name})")
 
