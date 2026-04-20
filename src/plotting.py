@@ -87,33 +87,52 @@ def plot_coverage_heatmap(
 def plot_season_bars(
     summary: pd.DataFrame,
     model_colours: dict,
+    include_n_tasks: bool = True,
+    bar_height: float = 0.8,
+    inches_per_bar: float = 0.32,
+    min_fig_height: float = 3.5,
+    top_bottom_pad: float = 0.35,
 ) -> None:
-    """
-    Two horizontal bar plots side-by-side: mean WIS (left) and mean log WIS
-    (right), sorted best → top.
+    n = len(summary)
+    fig_height = max(min_fig_height, n * inches_per_bar)
 
-    Parameters
-    ----------
-    summary       : DataFrame with columns model_id, mean_wis, mean_log_wis,
-                    n_tasks. Rows = eligible models only.
-    model_colours : dict mapping model_id → matplotlib colour.
-    """
-    fig, axes = plt.subplots(1, 2, figsize=(14, 7), constrained_layout=True)
+    fig, axes = plt.subplots(
+        1, 2,
+        figsize=(14, fig_height),
+        constrained_layout=True,
+    )
+
+    y = np.arange(n)
 
     for ax, metric, label in [
-        (axes[0], "mean_wis",     "Mean WIS"),
+        (axes[0], "mean_wis", "Mean WIS"),
         (axes[1], "mean_log_wis", "Mean log WIS"),
     ]:
-        s = summary.sort_values(metric, ascending=False)
+        s = summary.sort_values(metric, ascending=True).reset_index(drop=True)
         bar_colours = [model_colours.get(m, "0.5") for m in s["model_id"]]
 
-        bars = ax.barh(s["model_id"], s[metric], color=bar_colours)
+        bars = ax.barh(
+            y,
+            s[metric],
+            color=bar_colours,
+            height=bar_height,
+            align="center",
+        )
 
-        for bar, (_, row) in zip(bars, s.iterrows()):
-            ax.text(
-                bar.get_width() * 1.01, bar.get_y() + bar.get_height() / 2,
-                f"n={row['n_tasks']:,}", va="center", fontsize=7,
-            )
+        ax.set_yticks(y)
+        ax.set_yticklabels(s["model_id"])
+        ax.set_ylim(n - 0.5 + top_bottom_pad, -0.5 - top_bottom_pad)
+
+        if include_n_tasks:
+            xpad = 0.01 * s[metric].max()
+            for bar, (_, row) in zip(bars, s.iterrows()):
+                ax.text(
+                    bar.get_width() + xpad,
+                    bar.get_y() + bar.get_height() / 2,
+                    f"n={row['n_tasks']:,}",
+                    va="center",
+                    fontsize=10,
+                )
 
         ax.set_xlabel(label)
         ax.set_title(f"Season-average {label}")
@@ -121,7 +140,6 @@ def plot_season_bars(
         ax.grid(True, axis="x", alpha=0.4)
 
     plt.show()
-
 
 # WIS vs log WIS scatter (not super informative -- removed from notebooks)
 
@@ -212,7 +230,7 @@ def plot_by_horizon(
     hub_in_wis = [m for m in by_hor_wis.index if m in hub_set]
     hub_in_log = [m for m in by_hor_log.index if m in hub_set]
 
-    prefix = f"{hub_label} — " if hub_label else ""
+    prefix = f"{hub_label}: " if hub_label else ""
     fig, axes = plt.subplots(1, 2, figsize=(13, 5), constrained_layout=True)
 
     # Legend colours from inputs only
@@ -235,8 +253,8 @@ def plot_by_horizon(
     )
 
     for ax, data, top_models, hub_present, ylabel, title in [
-        (axes[0], by_hor_wis, top_by_wis, hub_in_wis, "Mean WIS",     f"{prefix}Mean WIS by horizon"),
-        (axes[1], by_hor_log, top_by_log, hub_in_log, "Mean log WIS", f"{prefix}Mean log WIS by horizon"),
+        (axes[0], by_hor_wis, top_by_wis, hub_in_wis, "Mean WIS",     "Mean WIS by horizon"),
+        (axes[1], by_hor_log, top_by_log, hub_in_log, "Mean log WIS", "Mean log WIS by horizon"),
     ]:
         for m in top_models:
             is_main = (m == main_model)
@@ -263,22 +281,21 @@ def plot_by_horizon(
         legend_handles = [
             Line2D([0], [0], color=submitted_colour, lw=2, marker="o", label="Submitted models"),
         ]
-
         if main_model is not None:
             legend_handles.append(
                 Line2D([0], [0], color=main_colour, lw=2, marker="o", label=main_model)
             )
-
         legend_handles.append(
             Line2D([0], [0], color=hub_colour, lw=2, marker="o", linestyle="--", label="Hub models")
         )
 
         ax.set_xlabel("Horizon (weeks ahead)")
         ax.set_ylabel(ylabel)
-        ax.set_title(f"{title}  (top {top_n} eligible + hub models)")
+        ax.set_title(f"{title}  ")
         ax.set_xticks(all_horizons)
-        ax.legend(handles=legend_handles, fontsize=7.5, loc="upper left")
+        ax.legend(handles=legend_handles, loc="upper left")
 
+    plt.suptitle(f"{prefix}top {top_n} eligible + hub models")
     plt.show()
 
 
@@ -307,7 +324,7 @@ def plot_weekly_scores(
     main_model        : Model ID to highlight separately in the plot/legend.
     main_model_colour : Optional override colour for main_model.
     """
-    prefix = f"{hub_label} — " if hub_label else ""
+    prefix = f"{hub_label}: " if hub_label else ""
 
     # Legend colours from inputs only
     submitted_colour = next(
@@ -331,8 +348,8 @@ def plot_weekly_scores(
     fig, axes = plt.subplots(2, 1, figsize=(13, 8), constrained_layout=True, sharex=True)
 
     for ax, metric, ylabel, title in [
-        (axes[0], "wis",     "Mean WIS",     f"{prefix}Weekly mean WIS over reference dates"),
-        (axes[1], "log_wis", "Mean log WIS", f"{prefix}Weekly mean log WIS over reference dates"),
+        (axes[0], "wis",     "Mean WIS",     "WIS"),
+        (axes[1], "log_wis", "Mean log WIS", "log WIS"),
     ]:
         for m in plot_models:
             sub = weekly[weekly["model_id"] == m].sort_values("reference_date")
@@ -353,7 +370,7 @@ def plot_weekly_scores(
         ax.set_ylabel(ylabel)
         ax.set_title(title)
 
-    axes[1].tick_params(axis="x", rotation=40)
+    axes[1].tick_params(axis="x", rotation=0)
 
     legend_handles = [
         Line2D(
@@ -396,7 +413,8 @@ def plot_weekly_scores(
         handles=legend_handles,
         loc="lower center",
         ncol=len(legend_handles),
-        fontsize=8,
+        fontsize=12,
         bbox_to_anchor=(0.5, -0.14),
     )
+    plt.suptitle(f"{prefix}Weekly Mean Performance over Reference Dates")
     plt.show()
