@@ -12,6 +12,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -181,7 +182,13 @@ def score_hub(hub: HubConfig) -> None:
     print(f"Scoring hub: {hub.name} (target: {hub.target_name})")
 
     forecasts = pd.read_parquet(hub.forecasts_path)
-    truth = pd.read_parquet(hub.truth_path)
+
+    if hub.truth_source_hub_name:
+        truth_path = Path("data/processed") / hub.truth_source_hub_name / "truth.parquet"
+        print(f"Loading truth from CDC hub '{hub.truth_source_hub_name}': {truth_path}")
+    else:
+        truth_path = hub.truth_path
+    truth = pd.read_parquet(truth_path)
 
     # Hospital admissions, quantile output only
     forecasts = forecasts.loc[

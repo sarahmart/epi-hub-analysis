@@ -17,10 +17,14 @@ class HubConfig:
     target_name: str       # target string in the forecasts, e.g. "wk inc covid hosp"
     season_start: pd.Timestamp
     season_end: pd.Timestamp
-    ensemble_id: str                          # model_id of the primary hub ensemble
-    baseline_id: str                          # model_id of the hub-generated baseline
-    google_id: str                            # model_id of the Google submission
+    ensemble_id: str = ""                     # model_id of the primary hub ensemble
+    baseline_id: str = ""                     # model_id of the hub-generated baseline
+    google_id: str = ""                       # model_id of the Google submission
     extra_ensemble_ids: tuple[str, ...] = ()  # additional hub-generated ensembles (for Flu)
+    # Google internal hubs
+    subtree_path: str | None = None           # path prefix within repo (for monorepo)
+    model_output_dir: str = "model-output"    # directory name containing model submissions
+    truth_source_hub_name: str | None = None  # score using this hub's truth data (internal hubs don't have truth data)
 
     # Derived paths
 
@@ -103,8 +107,50 @@ FLU_HUB = HubConfig(
     ),
 )
 
+GOOGLE_COVID_HUB = HubConfig(
+    name="google_covid",
+    owner="google-research",
+    repo="google-research",
+    branch="master",
+    target_name="wk inc covid hosp",
+    season_start=COVID_HUB.season_start,
+    season_end=COVID_HUB.season_end,
+    subtree_path="epi_forecasts/covid_hub/model_output",
+    model_output_dir="",
+    truth_source_hub_name="covid",
+)
+
+GOOGLE_FLU_HUB = HubConfig(
+    name="google_flu",
+    owner="google-research",
+    repo="google-research",
+    branch="master",
+    target_name="wk inc flu hosp",
+    season_start=FLU_HUB.season_start,
+    season_end=FLU_HUB.season_end,
+    subtree_path="epi_forecasts/flu_hub/model_output",
+    model_output_dir="",
+    truth_source_hub_name="flu",
+)
+
+GOOGLE_RSV_HUB = HubConfig(
+    name="google_rsv",
+    owner="google-research",
+    repo="google-research",
+    branch="master",
+    target_name="wk inc rsv hosp",
+    season_start=RSV_HUB.season_start,
+    season_end=RSV_HUB.season_end,
+    subtree_path="epi_forecasts/rsv_hub/model_output",
+    model_output_dir="",
+    truth_source_hub_name="rsv",
+)
+
 HUBS: dict[str, HubConfig] = {
     "covid": COVID_HUB,
     "rsv": RSV_HUB,
     "flu": FLU_HUB,
+    "google_covid": GOOGLE_COVID_HUB,
+    "google_flu": GOOGLE_FLU_HUB,
+    "google_rsv": GOOGLE_RSV_HUB,
 }

@@ -35,8 +35,42 @@ def _raw_base_url(hub: HubConfig) -> str:
     return f"https://raw.githubusercontent.com/{hub.owner}/{hub.repo}/{hub.branch}"
 
 
+def _get_subtree_paths(hub: HubConfig) -> list[str]:
+    """
+    For monorepos (Google internal): fetch only files within hub.subtree_path.
+
+    Uses the GitHub Contents API to resolve the SHA of the subtree directory,
+    then fetches its recursive tree.  Returns paths with the subtree prefix
+    prepended so that raw_url() works.
+    """
+    # Fetch the parent directory listing to get the SHA of the target subdirectory.
+    parent = hub.subtree_path.rsplit("/", 1)[0]
+    child_name = hub.subtree_path.rsplit("/", 1)[1]
+    parent_url = (
+        f"https://api.github.com/repos/{hub.owner}/{hub.repo}"
+        f"/contents/{parent}?ref={hub.branch}"
+    )
+    resp = requests.get(parent_url, timeout=60)
+    resp.raise_for_status()
+    entries = resp.json()
+    subtree_sha = next(
+        e["sha"] for e in entries if e["name"] == child_name and e["type"] == "dir"
+    )
+    tree_url = (
+        f"https://api.github.com/repos/{hub.owner}/{hub.repo}"
+        f"/git/trees/{subtree_sha}?recursive=1"
+    )
+    resp2 = requests.get(tree_url, timeout=60)
+    resp2.raise_for_status()
+    data = resp2.json()
+    prefix = hub.subtree_path + "/"
+    return [prefix + item["path"] for item in data["tree"] if item["type"] == "blob"]
+
+
 def get_repo_tree(hub: HubConfig) -> list[str]:
-    """Return all file paths in the repo."""
+    """Return all file paths in the repo (or subtree for monorepos)."""
+    if hub.subtree_path:
+        return _get_subtree_paths(hub)
     resp = requests.get(_api_tree_url(hub), timeout=60)
     resp.raise_for_status()
     data = resp.json()
@@ -77,8 +111,13 @@ def parse_reference_date_from_filename(path: str) -> pd.Timestamp | None:
 
 
 def keep_forecast_file(hub: HubConfig, path: str) -> bool:
-    if not path.startswith("model-output/"):
-        return False
+    if hub.model_output_dir == "":
+        # Google internal hub: paths prefixed with subtree_path
+        if hub.subtree_path and not path.startswith(hub.subtree_path + "/"):
+            return False
+    else:
+        if not path.startswith(hub.model_output_dir + "/"):
+            return False
     if not path.endswith(".csv"):
         return False
 
@@ -106,7 +145,12 @@ def load_forecasts(hub: HubConfig, paths: list[str]) -> pd.DataFrame:
 
         if "model_id" not in df.columns:
             parts = Path(path).parts
-            if len(parts) >= 3:
+            if hub.model_output_dir == "" and hub.subtree_path:
+                # Google hub: model_id right after subtree prefix
+                subtree_depth = len(Path(hub.subtree_path).parts)
+                if len(parts) > subtree_depth:
+                    df["model_id"] = parts[subtree_depth]
+            elif len(parts) >= 3:
                 df["model_id"] = parts[1]
 
         if "reference_date" not in df.columns:
@@ -217,7 +261,11 @@ def _bootstrap_forecast_manifest(hub: HubConfig, forecast_paths: list[str]) -> s
     for path in forecast_paths:
         ref_date = parse_reference_date_from_filename(path)
         parts = Path(path).parts
-        model_id = parts[1] if len(parts) >= 2 else None
+        if hub.model_output_dir == "" and hub.subtree_path:
+            subtree_depth = len(Path(hub.subtree_path).parts)
+            model_id = parts[subtree_depth] if len(parts) > subtree_depth else None
+        else:
+            model_id = parts[1] if len(parts) >= 2 else None
         if ref_date is not None and model_id is not None:
             if (ref_date.strftime("%Y-%m-%d"), model_id) in loaded:
                 result.add(path)
@@ -233,10 +281,15 @@ def main(hub: HubConfig, incremental: bool = False) -> None:
     paths = get_repo_tree(hub)
 
     forecast_paths = [p for p in paths if keep_forecast_file(hub, p)]
-    target_paths = find_target_data_files(paths)
 
     print(f"Found {len(forecast_paths)} forecast files in date window.")
-    print(f"Found {len(target_paths)} target-data files.")
+
+    if hub.truth_source_hub_name:
+        print(f"Truth data will be loaded from CDC hub '{hub.truth_source_hub_name}' during scoring.")
+        target_paths: list[str] = []
+    else:
+        target_paths = find_target_data_files(paths)
+        print(f"Found {len(target_paths)} target-data files.")
 
     if incremental:
         fcast_mpath = _manifest_path(hub.data_dir, "forecasts")
