@@ -12,6 +12,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import matplotlib.ticker as mticker
 from matplotlib.lines import Line2D
 
 
@@ -417,4 +419,205 @@ def plot_weekly_scores(
         bbox_to_anchor=(0.5, -0.14),
     )
     plt.suptitle(f"{prefix}Weekly Mean Performance over Reference Dates")
+    plt.show()
+
+
+# Forecast fan vs observed truth
+## Overall season performance per state
+
+def plot_forecast_fans(
+    forecasts: pd.DataFrame,
+    truth: pd.DataFrame,
+    model_display: dict,
+    hub_label: str = "",
+    location_names: dict | None = None,
+    locations: list[str] | None = None,
+    exclude_locations: set[str] | None = None,
+    ncols: int = 6,
+    inner_ci: tuple[float, float] = (0.25, 0.75),
+    outer_ci: tuple[float, float] = (0.025, 0.975),
+    subplot_height: float = 2.5,
+    subplot_width: float = 3.2,
+    plot_every_n: int = 1,
+) -> None:
+    """
+    Fan chart of quantile forecast intervals vs observed truth for every location.
+
+    One subplot per location. For each reference date and each enabled model,
+    draws an outer quantile band, an inner quantile band, and a median line.
+    The true observations are shown as a continuous black line.
+
+    Parameters
+    ----------
+    forecasts         : DataFrame with columns reference_date, horizon,
+                        target_end_date, location, output_type, output_type_id,
+                        value, model_id.
+    truth             : DataFrame with columns target_end_date, location, value
+                        (one observed value per date × location).
+    model_display     : dict of {model_id: config_dict}. Config keys:
+                          "enabled"    : bool  — plot this model? (default False)
+                          "color"      : str   — fan/line colour (default "0.5")
+                          "label"      : str   — legend entry (default = model_id)
+                          "alpha_outer": float — opacity of outer CI band (default 0.15)
+                          "alpha_inner": float — opacity of inner CI band (default 0.35)
+                          "zorder"     : float — drawing order; higher = on top (default 2)
+    hub_label         : Infection name (for titles & labels).
+    location_names    : Optional dict mapping location code → display name.
+    locations         : Ordered list of location codes to plot. Defaults to all
+                        locations in truth (after applying exclude_locations),
+                        sorted alphabetically by display name.
+    exclude_locations : Set of location codes to omit from the default location
+                        list. Defaults to {"US"} (national aggregate excluded).
+                        Pass an empty set to include all locations.
+                        Has no effect when locations is supplied explicitly.
+    ncols             : Number of subplot columns in the grid.
+    inner_ci          : (low, high) quantile pair for the inner (darker) CI band.
+    outer_ci          : (low, high) quantile pair for the outer (lighter) CI band.
+    subplot_height    : Height of each subplot in inches.
+    subplot_width     : Width of each subplot in inches.
+    plot_every_n      : Only draw fans for every nth reference date (sorted
+                        chronologically). The observed truth line is always
+                        shown in full. Default 1 (all dates).
+    """
+    enabled_models = [m for m, cfg in model_display.items() if cfg.get("enabled", False)]
+    if not enabled_models:
+        raise ValueError("No models enabled in model_display.")
+
+    # Needed quantile levels (round to avoid floating-point comparison issues)
+    needed_q = {round(q, 4) for q in {inner_ci[0], inner_ci[1], outer_ci[0], outer_ci[1], 0.5}}
+    lo_out = round(outer_ci[0], 4)
+    hi_out = round(outer_ci[1], 4)
+    lo_in = round(inner_ci[0], 4)
+    hi_in = round(inner_ci[1], 4)
+
+    # Filter forecasts: quantile output type, enabled models, non-negative horizons only
+    fc_q = forecasts[
+        (forecasts["output_type"] == "quantile")
+        & forecasts["model_id"].isin(enabled_models)
+        & (forecasts["horizon"] >= 0)
+    ].copy()
+    fc_q["output_type_id"] = fc_q["output_type_id"].astype(float).round(4)
+    fc_q = fc_q[fc_q["output_type_id"].isin(needed_q)]
+
+    # Truth: one row per (date, location)
+    truth_clean = (
+        truth[["target_end_date", "location", "value"]]
+        .drop_duplicates(["target_end_date", "location"])
+    )
+
+    # Determine location list (only applies when locations is not provided explicitly)
+    _exclude = exclude_locations if exclude_locations is not None else {"US"}
+    if locations is None:
+        all_locs = [l for l in truth_clean["location"].unique() if l not in _exclude]
+
+        def _sort_key(x: str) -> tuple:
+            if x == "US":
+                return ("", "")
+            name = location_names.get(x, x) if location_names else x
+            return ("a", name)
+
+        locations = sorted(all_locs, key=_sort_key)
+
+    nrows = int(np.ceil(len(locations) / ncols))
+    fig, axes = plt.subplots(
+        nrows, ncols,
+        figsize=(subplot_width * ncols, subplot_height * nrows),
+        constrained_layout=True,
+        sharex=True,
+    )
+    axes_flat = np.atleast_1d(axes).ravel()
+
+    for idx, loc in enumerate(locations):
+        ax = axes_flat[idx]
+        loc_name = location_names.get(loc, loc) if location_names else loc
+
+        # Observed truth line
+        loc_truth = truth_clean[truth_clean["location"] == loc].sort_values("target_end_date")
+        if not loc_truth.empty:
+            ax.plot(
+                loc_truth["target_end_date"], loc_truth["value"],
+                color="black", linewidth=1.5, marker="o", markersize=2.5, zorder=10,
+            )
+
+        # Forecast fans per model, per reference date
+        for model_id in enabled_models:
+            cfg = model_display[model_id]
+            color = cfg.get("color", "0.5")
+            alpha_outer = cfg.get("alpha_outer", 0.15)
+            alpha_inner = cfg.get("alpha_inner", 0.35)
+            zorder = float(cfg.get("zorder", 2))
+
+            model_fc = fc_q[(fc_q["model_id"] == model_id) & (fc_q["location"] == loc)]
+            if model_fc.empty:
+                continue
+
+            all_ref_dates = sorted(model_fc["reference_date"].unique())
+            for ref_date in all_ref_dates[::plot_every_n]:
+                chunk = model_fc[model_fc["reference_date"] == ref_date]
+                pivot = (
+                    chunk.pivot_table(
+                        index="target_end_date",
+                        columns="output_type_id",
+                        values="value",
+                        aggfunc="first",
+                    )
+                    .sort_index()
+                )
+                dates = pivot.index
+
+                if lo_out in pivot.columns and hi_out in pivot.columns:
+                    ax.fill_between(
+                        dates, pivot[lo_out], pivot[hi_out],
+                        alpha=alpha_outer, color=color, linewidth=0, zorder=zorder,
+                    )
+                if lo_in in pivot.columns and hi_in in pivot.columns:
+                    ax.fill_between(
+                        dates, pivot[lo_in], pivot[hi_in],
+                        alpha=alpha_inner, color=color, linewidth=0, zorder=zorder,
+                    )
+                if 0.5 in pivot.columns:
+                    ax.plot(
+                        dates, pivot[0.5],
+                        color=color, linewidth=1.0, marker="o", markersize=1.8,
+                        zorder=zorder + 0.5,
+                    )
+
+        ax.set_title(loc_name, pad=2)
+        ax.tick_params(axis="both")
+        ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
+        ax.xaxis.set_major_locator(mdates.MonthLocator())
+        ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:,.0f}"))
+        ax.grid(True, alpha=0.3)
+
+    # Hide unused axes
+    for j in range(len(locations), len(axes_flat)):
+        axes_flat[j].set_visible(False)
+
+    # Legend: observed + one entry per enabled model
+    legend_handles = [
+        Line2D([0], [0], color="black", lw=1.5, marker="o", markersize=5, label="Observed"),
+    ]
+    for model_id in enabled_models:
+        cfg = model_display[model_id]
+        legend_handles.append(
+            Line2D(
+                [0], [0],
+                color=cfg.get("color", "0.5"), lw=2, marker="o", markersize=5,
+                label=f"{cfg.get('label', model_id)}  (median + 50%/95% PI)",
+            )
+        )
+
+    fig.supylabel(f"Incident Weekly {hub_label} Hospital Admissions")
+    fig.supxlabel("Time (2025-26 season)")
+
+    fig.legend(
+        handles=legend_handles,
+        loc="lower center",
+        ncol=len(legend_handles),
+        bbox_to_anchor=(0.5, -0.03),
+    )
+
+    title = f"Incident weekly {hub_label} hospital admissions and GoogleSAI forecasts"
+    fig.suptitle(title)
+
     plt.show()
