@@ -14,7 +14,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
+import matplotlib.transforms as mtransforms
 from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 
 
 # Coverage heatmap
@@ -415,7 +417,7 @@ def plot_weekly_scores(
         handles=legend_handles,
         loc="lower center",
         ncol=len(legend_handles),
-        fontsize=12,
+        # fontsize=12,
         bbox_to_anchor=(0.5, -0.14),
     )
     plt.suptitle(f"{prefix}Weekly Mean Performance over Reference Dates")
@@ -619,5 +621,190 @@ def plot_forecast_fans(
 
     title = f"Incident weekly {hub_label} hospital admissions and GoogleSAI forecasts"
     fig.suptitle(title)
+
+    plt.show()
+
+
+# Standardised rank distribution (from https://www.pnas.org/doi/10.1073/pnas.2113561119, Fig. 2)
+
+def plot_rank_distribution(
+    scores: pd.DataFrame,
+    eligible_models: list[str],
+    model_colours: dict,
+    score_col: str = "log_wis",
+    top_n: int = 10,
+    main_model: str | None = None,
+    hub_label: str = "",
+    show_n_tasks: bool = True,
+    kde_max_height: float = 1,
+    inches_per_row: float = 0.55,
+) -> None:
+    """
+    Plot of each model's distribution of standardised log WIS ranks,
+    inspired by Fig. 2 of Cramer et al. (2022, PNAS).
+
+    For every task (reference_date × horizon × location), all models with
+    a score in that group are ranked by `score_col` (ascending; lower is better).
+    The standardised rank maps rank 1 (best) → 1.0 and rank n (worst) → 0.0.
+    The kernel density of each model's rank distribution is drawn as a filled
+    ridgeline, coloured by quartile. Models are ordered by Q1 (descending) so
+    those that most consistently avoid low ranks (bad) appear at the top.
+
+    Parameters
+    ----------
+    scores          : Scores DataFrame with columns model_id, reference_date,
+                      horizon, location, wis, log_wis.
+    eligible_models : Model IDs to include.
+    model_colours   : dict model_id → colour; used for main_model highlight.
+    score_col       : Column to rank on — "log_wis" (default) or "wis".
+    top_n           : Maximum number of models to display, selected by Q1 of
+                      the standardised rank distribution (descending).
+    main_model      : Model ID to highlight with a coloured outline and label.
+    hub_label       : Short hub name for the figure title.
+    show_n_tasks    : If True, annotate each ridge with the model's task count.
+    kde_max_height  : Maximum ridge height in row units. Values > 1.0 produce
+                      overlapping ridges (ridgeline effect).
+    inches_per_row  : Figure height allocated per model row.
+    """
+    _Q_COLORS = ["#440154", "#31688e", "#7ebe1e", "#35b779"]  # Q1→Q4
+    _main_color = model_colours.get(main_model, "#e91e8c") if main_model else "#e91e8c"
+
+    # Standardised ranks across ALL models present in scores
+    # Ranking includes every model that submitted for each group
+    _grp = ["reference_date", "horizon", "location"]
+    ranked = scores[scores[score_col].notna()].copy()
+    ranked["_raw"] = ranked.groupby(_grp)[score_col].rank(
+        method="average", ascending=True
+    )
+    ranked["_n"] = ranked.groupby(_grp)["model_id"].transform("count")
+    ranked = ranked[ranked["_n"] > 1].copy()  # need ≥2 models to define a rank
+    ranked["std_rank"] = (ranked["_n"] - ranked["_raw"]) / (ranked["_n"] - 1)
+
+    # Select top-N eligible models by Q1
+    elig = ranked[ranked["model_id"].isin(eligible_models)]
+    q1_series = (
+        elig.groupby("model_id")["std_rank"]
+        .quantile(0.25)
+        .sort_values(ascending=False)
+    )
+    model_order = q1_series.index[:top_n].tolist()  # [best, …, worst]
+    n_models = len(model_order)
+    if n_models == 0:
+        return
+
+    elig_top = elig[elig["model_id"].isin(model_order)]
+    ranks_map = {
+        m: elig_top.loc[elig_top["model_id"] == m, "std_rank"].values
+        for m in model_order
+    }
+    n_tasks_map = {m: len(v) for m, v in ranks_map.items()}
+
+    # Draw ridgelines
+    fig_height = max(3.5, n_models * inches_per_row + 1.6)
+    fig, ax = plt.subplots(figsize=(10, fig_height), constrained_layout=True)
+    right_trans = mtransforms.blended_transform_factory(ax.transAxes, ax.transData)
+
+    for i, model in enumerate(model_order):
+        y_base = float(n_models - 1 - i)  # i=0 (best) at the top
+        data = ranks_map[model]
+        if len(data) < 2:
+            continue
+
+        # Quartile cuts from actual data
+        q25, q50, q75 = np.percentile(data, [25, 50, 75])
+
+        # Build x grid that includes exact quartile positions so band
+        # boundaries are pixel-perfect with no gaps between colours
+        x_eval = np.sort(np.unique(np.concatenate([
+            np.linspace(0, 1, 300), [q25, q50, q75],
+        ])))
+
+        # KDE using Scott's rule, numpy only (no scipy dependency)
+        h = max(1.06 * np.std(data) * len(data) ** -0.2, 1e-3)
+        diff = (x_eval[:, None] - data[None, :]) / h
+        y_raw = np.exp(-0.5 * diff ** 2).mean(axis=1) / (h * np.sqrt(2 * np.pi))
+        if y_raw.max() == 0:
+            continue
+        y_kde = y_raw / y_raw.max() * kde_max_height + y_base
+
+        # Quartile-coloured fill
+        for x_lo, x_hi, color in [
+            (0.0, q25, _Q_COLORS[0]),
+            (q25, q50, _Q_COLORS[1]),
+            (q50, q75, _Q_COLORS[2]),
+            (q75, 1.0, _Q_COLORS[3]),
+        ]:
+            mask = (x_eval >= x_lo) & (x_eval <= x_hi)
+            if mask.sum() > 1:
+                ax.fill_between(
+                    x_eval[mask], y_base, y_kde[mask],
+                    color=color, linewidth=0, zorder=2,
+                )
+
+        # Ridge outline — closed polygon that drops back to y_base at both
+        # edges so the curve doesn't float open at x=0 and x=1
+        x_closed = np.concatenate([[0.0], x_eval, [1.0]])
+        y_closed = np.concatenate([[y_base], y_kde, [y_base]])
+        is_main = (model == main_model)
+        ax.plot(
+            x_closed, y_closed,
+            color=_main_color if is_main else "black",
+            lw=2.0 if is_main else 0.8,
+            zorder=3 + int(is_main),
+        )
+
+        # White vertical line at the median
+        med_idx = int(np.argmin(np.abs(x_eval - q50)))
+        ax.plot(
+            [q50, q50], [y_base, y_kde[med_idx]],
+            color="white", lw=1.2, zorder=5,
+        )
+
+        # Thin baseline separator — drawn on top so it's visible through overlap
+        ax.plot([0, 1], [y_base, y_base], color="black", lw=0.5, zorder=6)
+
+        # n_tasks annotation just outside the right axis
+        if show_n_tasks:
+            ax.text(
+                1.01, y_base + kde_max_height * 0.45,
+                f"n={n_tasks_map[model]:,}",
+                transform=right_trans,
+                va="center", ha="left", color="0.4",
+            )
+
+    # 4. Axes
+    ax.set_yticks(range(n_models))
+    ax.set_yticklabels(model_order[::-1])  # y=0 = worst, y=n-1 = best
+    for tick, label in zip(ax.get_yticklabels(), model_order[::-1]):
+        if label == main_model:
+            tick.set_color(_main_color)
+            tick.set_fontweight("bold")
+
+    ax.set_xlim(0, 1)
+    ax.set_ylim(-0.5, n_models - 1 + kde_max_height + 0.3)
+    ax.set_xlabel("standardized rank")
+    ax.set_ylabel("")
+    ax.grid(False)
+    ax.xaxis.grid(True, alpha=0.3)
+
+    # Legend
+    _q_labels = ["Q1 (bottom 25%)", "Q2 (25–50%)", "Q3 (50–75%)", "Q4 (top 25%)"]
+    legend_handles = [
+        Patch(facecolor=c, label=l) for c, l in zip(_Q_COLORS, _q_labels)
+    ]
+    _ax_h = max(2.0, n_models * inches_per_row)
+    ax.legend(
+        handles=legend_handles, title="Rank Quartile",
+        loc="upper center", bbox_to_anchor=(0.5, -0.42 / _ax_h),
+        ncol=4, frameon=True,
+    )
+
+    metric_label = "log WIS" if score_col == "log_wis" else "WIS"
+    prefix = f"{hub_label}: " if hub_label else ""
+    ax.set_title(
+        f"{prefix}Distribution of standardized {metric_label} ranks."
+        # f"Rank 1.0 = best {metric_label} for that location × horizon × week  |  "
+        # f"Models ordered by Q1 (↑ = rarely ranked poorly)",
+    )
 
     plt.show()
