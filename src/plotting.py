@@ -19,6 +19,7 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
+from src.colouring import GOOGLE_PINK
 
 # Coverage heatmap
 # TODO: sort models somehow? alphabetically or by coverage?
@@ -732,6 +733,159 @@ def plot_combined_season_bars(
     plt.show()
 
 
+# Per-jurisdiction performance plot
+
+def plot_by_location(
+    by_loc_wis: pd.DataFrame,
+    by_loc_log: pd.DataFrame,
+    model_colours: dict,
+    hub_models: set | None = None,
+    top_n: int = 100,
+    hub_label: str = "",
+    main_model: str | None = None,
+    main_model_colour: str | None = None,
+    inches_per_row: float = 0.25,
+) -> None:
+    """
+    Model performance per jurisdiction.
+    One row per location, one dot per model. Locations sorted alphabetically
+    (A at top).
+
+    Parameters
+    ----------
+    by_loc_wis, by_loc_log
+        DataFrames indexed by model_id, columns = location names or codes.
+        Pre-filter to eligible + hub models before passing.
+    model_colours     : dict mapping model_id → colour.
+    hub_models        : Set of hub model IDs (always included, distinct style).
+    top_n             : Max non-hub eligible models to include.
+    hub_label         : Short hub name for the figure suptitle.
+    main_model        : Model ID to emphasise (large diamond, distinct colour).
+    main_model_colour : Optional colour override for main_model.
+    inches_per_row    : Figure height per location row.
+    """
+    hub_set = hub_models or set()
+
+    # Select top_n non-hub models by overall mean log WIS, plus all hub models
+    non_hub_log = by_loc_log.loc[~by_loc_log.index.isin(hub_set)]
+    top_eligible = non_hub_log.mean(axis=1).nsmallest(top_n).index.tolist()
+    hub_in = [m for m in by_loc_log.index if m in hub_set]
+    plot_models = list(dict.fromkeys(top_eligible + hub_in))
+    if not plot_models:
+        return
+
+    _main_colour = (
+        main_model_colour if main_model_colour is not None
+        else model_colours.get(main_model, GOOGLE_PINK) if main_model else GOOGLE_PINK
+    )
+
+    # Alphabetical order
+    sorted_locs = sorted(by_loc_log.columns, reverse=True)
+    n_locs = len(sorted_locs)
+    y_map = {loc: i for i, loc in enumerate(sorted_locs)}
+
+    fig_height = max(5.0, n_locs * inches_per_row + 1.8)
+    prefix = f"{hub_label}: " if hub_label else ""
+
+    fig, axes = plt.subplots(
+        1, 2, figsize=(13, fig_height),
+        constrained_layout=True, sharey=True,
+    )
+
+    for ax, data, xlabel, panel_title in [
+        (axes[0], by_loc_wis, "Mean WIS",     "Mean WIS by jurisdiction"),
+        (axes[1], by_loc_log, "Mean log WIS", "Mean log WIS by jurisdiction"),
+    ]:
+        avail = [loc for loc in sorted_locs if loc in data.columns]
+        sub = data.loc[[m for m in plot_models if m in data.index], avail]
+
+        # Grey range lines (min → max across all models per location)
+        for loc in avail:
+            vals = sub[loc].dropna()
+            if len(vals) >= 2:
+                ax.hlines(
+                    y_map[loc], vals.min(), vals.max(),
+                    color="0.82", linewidth=0.7, zorder=1,
+                )
+
+        # Dots drawn back-to-front: other eligible → hub → main_model
+        draw_order = (
+            [m for m in top_eligible if m != main_model and m in sub.index]
+            + [m for m in hub_in if m != main_model and m in sub.index]
+            + ([main_model] if main_model and main_model in sub.index else [])
+        )
+
+        for m in draw_order:
+            is_main = (m == main_model)
+            is_hub  = (m in hub_set)
+            color   = _main_colour if is_main else model_colours.get(m, "0.5")
+            marker  = "D" if is_main else ("s" if is_hub else "o")
+            size    = 55  if is_main else (35  if is_hub else 30)
+            zorder  = 5   if is_main else (4   if is_hub else 2)
+            alpha   = 1.0 if (is_main or is_hub) else 0.75
+
+            valid = [
+                (y_map[loc], sub.loc[m, loc])
+                for loc in avail
+                if not pd.isna(sub.loc[m, loc])
+            ]
+            if not valid:
+                continue
+            ys, xs = zip(*valid)
+            ax.scatter(
+                xs, ys, color=color, s=size, zorder=zorder,
+                alpha=alpha, marker=marker,
+                edgecolors="white" if is_main else "none",
+                linewidths=0.5,
+            )
+
+        ax.set_xlabel(xlabel)
+        ax.set_title(panel_title, pad=5)
+        ax.grid(True, axis="x", alpha=0.3)
+        ax.grid(False, axis="y")
+        ax.tick_params(axis="y", length=0)
+
+    axes[0].set_yticks(range(n_locs))
+    axes[0].set_yticklabels(sorted_locs)
+    axes[0].set_ylim(-0.7, n_locs - 0.3)
+
+    # Legend
+    legend_handles = []
+    if main_model:
+        legend_handles.append(Line2D(
+            [0], [0], marker="D", color="w", markerfacecolor=_main_colour,
+            markersize=8, markeredgecolor="white", markeredgewidth=0.5,
+            label=main_model,
+        ))
+    for m in hub_in:
+        if m == main_model:
+            continue
+        legend_handles.append(Line2D(
+            [0], [0], marker="s", color="w",
+            markerfacecolor=model_colours.get(m, "black"),
+            markersize=8, label=m,
+        ))
+    others = [m for m in top_eligible if m != main_model]
+    if others:
+        _oc = next((model_colours[m] for m in others if m in model_colours), "0.5")
+        legend_handles.append(Line2D(
+            [0], [0], marker="o", color="w", markerfacecolor=_oc,
+            markersize=8, alpha=0.75,
+            label=f"Top {min(top_n, len(others))} eligible models",
+        ))
+
+    if legend_handles:
+        fig.legend(
+            handles=legend_handles,
+            loc="lower center",
+            ncol=min(len(legend_handles), 5),
+            bbox_to_anchor=(0.5, -0.04),
+        )
+
+    fig.suptitle(f"{prefix}Model performance by jurisdiction")
+    plt.show()
+
+
 # Standardised rank distribution (from https://www.pnas.org/doi/10.1073/pnas.2113561119, Fig. 2)
 
 def plot_rank_distribution(
@@ -774,7 +928,7 @@ def plot_rank_distribution(
     inches_per_row  : Figure height allocated per model row.
     """
     _Q_COLORS = ["#440154", "#31688e", "#7ebe1e", "#35b779"]  # Q1→Q4
-    _main_color = model_colours.get(main_model, "#e91e8c") if main_model else "#e91e8c"
+    _main_color = model_colours.get(main_model, GOOGLE_PINK) if main_model else GOOGLE_PINK
 
     # Standardised ranks across ALL models present in scores
     # Ranking includes every model that submitted for each group
