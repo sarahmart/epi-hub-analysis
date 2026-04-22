@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 import matplotlib.transforms as mtransforms
+from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
@@ -622,6 +623,112 @@ def plot_forecast_fans(
     title = f"Incident weekly {hub_label} hospital admissions and GoogleSAI forecasts"
     fig.suptitle(title)
 
+    plt.show()
+
+
+# Combined season-average bar chart across all three infections
+
+def plot_combined_season_bars(
+    flu_summary: pd.DataFrame,
+    covid_summary: pd.DataFrame,
+    rsv_summary: pd.DataFrame,
+    flu_colours: dict,
+    covid_colours: dict,
+    rsv_colours: dict,
+    metric: str = "mean_log_wis",
+    bar_height: float = 0.7,
+    inches_per_bar: float = 0.30,
+    panel_gap: float = 1.5,
+) -> None:
+    """
+    Single-figure horizontal bar comparison across Flu, COVID-19 and RSV.
+
+    Flu occupies the full left column. COVID and RSV are stacked in the right
+    column, separated by panel_gap inches. Every bar row has the same physical
+    height (inches_per_bar) across all three panels.
+
+    Parameters
+    ----------
+    flu_summary, covid_summary, rsv_summary
+        DataFrames with columns model_id and the chosen metric column, one row
+        per model. Pre-filter to the desired model set (e.g. eligible + hub
+        models) before passing. Sorted ascending by metric inside the function.
+    flu_colours, covid_colours, rsv_colours
+        dict mapping model_id → colour string.
+    metric        : Column to plot — "mean_log_wis" (default) or "mean_wis".
+    bar_height    : Fractional bar height within each row (0–1).
+    inches_per_bar: Vertical inches allocated per model row.
+    panel_gap     : Inches of whitespace between the COVID-19 and RSV panels.
+    """
+    n_flu   = len(flu_summary)
+    n_covid = len(covid_summary)
+    n_rsv   = len(rsv_summary)
+
+    metric_label = "Mean log WIS" if "log" in metric else "Mean WIS"
+
+    _title_h = 0.75   # inches reserved for suptitle above plot area
+    _xlab_h  = 0.55   # inches reserved for x-label / tick labels below axes
+
+    # Content height: tallest column (bars only) + gap between COVID and RSV
+    n_right = n_covid + n_rsv
+    content_h = max(n_flu, n_right) * inches_per_bar + panel_gap
+    fig_height = max(4.5, content_h + _title_h + _xlab_h)
+
+    fig = plt.figure(figsize=(14, fig_height))
+
+    # Column x-positions (figure fractions)
+    # Reproduces GridSpec(left=0.16, right=0.97, wspace=0.5) geometry:
+    #   col_w = (0.97 - 0.16) / 2.5;  gap = 0.5 * col_w
+    _lft, _rgt = 0.16, 0.97
+    _col_w = (_rgt - _lft) / 2.5          # ≈ 0.324
+    _lc_l  = _lft                          # left column left edge
+    _lc_w  = _col_w
+    _rc_l  = _lft + 1.5 * _col_w          # right column left edge  ≈ 0.646
+    _rc_w  = _rgt - _rc_l
+
+    # Row y-positions (figure fractions, measured from bottom)
+    _top = (fig_height - _title_h) / fig_height   # top of plot area
+
+    # Flu: full left column, anchored at top
+    _flu_h   = n_flu   * inches_per_bar / fig_height
+    _flu_top = _top
+    _flu_bot = _flu_top - _flu_h
+
+    # COVID: right column, anchored at top
+    _cov_h   = n_covid * inches_per_bar / fig_height
+    _cov_top = _top - panel_gap / fig_height
+    _cov_bot = _cov_top - _cov_h
+
+    # RSV: below COVID, separated by panel_gap
+    _rsv_h   = n_rsv   * inches_per_bar / fig_height
+    _rsv_top = _cov_bot - panel_gap / fig_height
+    _rsv_bot = _rsv_top - _rsv_h
+
+    ax_flu   = fig.add_axes([_lc_l, _flu_bot, _lc_w, _flu_h])
+    ax_covid = fig.add_axes([_rc_l, _cov_bot, _rc_w, _cov_h])
+    ax_rsv   = fig.add_axes([_rc_l, _rsv_bot, _rc_w, _rsv_h])
+
+    # Draw bars
+    for ax, summary, colours, label in [
+        (ax_flu,   flu_summary,   flu_colours,   "FluSight Forecast Hub"),
+        (ax_covid, covid_summary, covid_colours, "COVIDHub"),
+        (ax_rsv,   rsv_summary,   rsv_colours,   "RSVHub"),
+    ]:
+        s = summary.sort_values(metric, ascending=False).reset_index(drop=True)
+        n = len(s)
+        y = np.arange(n)
+        colors = [colours.get(m, "0.5") for m in s["model_id"]]
+
+        ax.barh(y, s[metric], color=colors, height=bar_height, align="center")
+        ax.set_yticks(y)
+        ax.set_yticklabels(s["model_id"])
+        ax.set_ylim(-0.75, n - 0.25)
+        ax.set_title(label, pad=5)
+        ax.set_xlim(0, s[metric].max() * 1.15)
+        ax.set_xlabel(metric_label)
+        ax.grid(True, axis="x", alpha=0.4)
+
+    fig.suptitle(f"Season-average {metric_label}")
     plt.show()
 
 
