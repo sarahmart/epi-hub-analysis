@@ -93,6 +93,8 @@ def plot_coverage_heatmap(
 def plot_season_bars(
     summary: pd.DataFrame,
     model_colours: dict,
+    model_hatches: dict | None = None,
+    model_labels: dict | None = None,
     include_n_tasks: bool = True,
     bar_height: float = 0.8,
     inches_per_bar: float = 0.32,
@@ -125,8 +127,12 @@ def plot_season_bars(
             align="center",
         )
 
+        if model_hatches is not None:
+            for bar, model_id in zip(bars, s["model_id"]):
+                bar.set_hatch(model_hatches.get(model_id, ""))
+
         ax.set_yticks(y)
-        ax.set_yticklabels(s["model_id"])
+        ax.set_yticklabels([model_labels.get(m, m) if model_labels else m for m in s["model_id"]])
         ax.set_ylim(n - 0.5 + top_bottom_pad, -0.5 - top_bottom_pad)
 
         if include_n_tasks:
@@ -636,6 +642,10 @@ def plot_combined_season_bars(
     flu_colours: dict,
     covid_colours: dict,
     rsv_colours: dict,
+    flu_hatches: dict | None = None,
+    covid_hatches: dict | None = None,
+    rsv_hatches: dict | None = None,
+    model_labels: dict | None = None,
     metric: str = "mean_log_wis",
     bar_height: float = 0.7,
     inches_per_bar: float = 0.30,
@@ -710,19 +720,23 @@ def plot_combined_season_bars(
     ax_rsv   = fig.add_axes([_rc_l, _rsv_bot, _rc_w, _rsv_h])
 
     # Draw bars
-    for ax, summary, colours, label in [
-        (ax_flu,   flu_summary,   flu_colours,   "FluSight Forecast Hub"),
-        (ax_covid, covid_summary, covid_colours, "COVIDHub"),
-        (ax_rsv,   rsv_summary,   rsv_colours,   "RSVHub"),
+    for ax, summary, colours, hatches, label in [
+        (ax_flu,   flu_summary,   flu_colours,   flu_hatches,   "FluSight Forecast Hub"),
+        (ax_covid, covid_summary, covid_colours, covid_hatches, "COVIDHub"),
+        (ax_rsv,   rsv_summary,   rsv_colours,   rsv_hatches,   "RSVHub"),
     ]:
         s = summary.sort_values(metric, ascending=False).reset_index(drop=True)
         n = len(s)
         y = np.arange(n)
         colors = [colours.get(m, "0.5") for m in s["model_id"]]
 
-        ax.barh(y, s[metric], color=colors, height=bar_height, align="center")
+        bars = ax.barh(y, s[metric], color=colors, height=bar_height, align="center")
+
+        if hatches is not None:
+            for bar, model_id in zip(bars, s["model_id"]):
+                bar.set_hatch(hatches.get(model_id, ""))
         ax.set_yticks(y)
-        ax.set_yticklabels(s["model_id"])
+        ax.set_yticklabels([model_labels.get(m, m) if model_labels else m for m in s["model_id"]])
         ax.set_ylim(-0.75, n - 0.25)
         ax.set_title(label, pad=5)
         ax.set_xlim(0, s[metric].max() * 1.15)
@@ -730,6 +744,128 @@ def plot_combined_season_bars(
         ax.grid(True, axis="x", alpha=0.4)
 
     fig.suptitle(f"Season-average {metric_label}")
+    plt.show()
+
+
+# Cross-hub relative WIS bar chart
+
+def plot_crosshub_rel_bars(
+    summaries: dict,
+    colours: dict,
+    hatches: dict | None = None,
+    model_labels: dict | None = None,
+    legend_entries: list | None = None,
+    metric: str = "rel_log_wis",
+    metric_label: str = "Relative log WIS  (< 1 = better than baseline)",
+    title: str = "Cross-hub: Relative log WIS vs CDC ensemble (on common tasks)",
+    diseases: list | None = None,
+    bar_height: float = 0.7,
+    inches_per_bar: float = 0.25,
+    panel_gap: float = 1.0,
+) -> None:
+    """
+    Horizontal bar chart of a relative WIS metric across three diseases.
+
+    Layout mirrors plot_combined_season_bars: the first disease occupies the
+    full left column; the second and third are stacked in the right column,
+    separated by panel_gap inches. Bar physical height is equal across panels.
+
+    Parameters
+    ----------
+    summaries      : dict disease → DataFrame containing model_id and metric.
+    colours        : dict disease → {model_id: colour}.
+    hatches        : dict disease → {model_id: hatch pattern}.
+    model_labels   : Optional {model_id: display_name} applied to y-tick labels.
+    legend_entries : Optional list of (facecolor, hatch, label) tuples used to
+                     build the shared figure legend. Edit labels freely here —
+                     colours and hatches are set independently of the bars, so
+                     entries that share a colour can carry distinct labels.
+    metric         : Column name to plot (default "rel_log_wis").
+    metric_label   : x-axis label.
+    title          : Figure suptitle.
+    diseases       : Ordered list of three disease keys — [left, top-right, bot-right].
+                     Defaults to the order of summaries.keys().
+    bar_height     : Fractional bar height within each row (0–1).
+    inches_per_bar : Physical inches allocated per model row.
+    panel_gap      : Vertical inches between the two right-column panels.
+    """
+    if diseases is None:
+        diseases = list(summaries.keys())
+    d_l, d_tr, d_br = diseases[0], diseases[1], diseases[2]
+
+    cleaned = {
+        d: (summaries[d]
+            .dropna(subset=[metric])
+            .sort_values(metric, ascending=False)
+            .reset_index(drop=True))
+        for d in diseases
+    }
+    n = {d: len(cleaned[d]) for d in diseases}
+
+    _title_h = 0.75
+    _xlab_h  = 1.1 if legend_entries else 0.55
+
+    content_h  = max(n[d_l], n[d_tr] + n[d_br]) * inches_per_bar + panel_gap
+    fig_height = max(4.5, content_h + _title_h + _xlab_h)
+
+    fig = plt.figure(figsize=(14, fig_height))
+
+    # Column geometry — identical to plot_combined_season_bars
+    _lft, _rgt = 0.16, 0.97
+    _col_w = (_rgt - _lft) / 2.5
+    _lc_l, _lc_w = _lft, _col_w
+    _rc_l, _rc_w = _lft + 1.5 * _col_w, _rgt - (_lft + 1.5 * _col_w)
+
+    _top = (fig_height - _title_h) / fig_height
+
+    _l_h    = n[d_l]  * inches_per_bar / fig_height
+    _tr_h   = n[d_tr] * inches_per_bar / fig_height
+    _br_h   = n[d_br] * inches_per_bar / fig_height
+    _gap    = panel_gap / fig_height
+
+    ax_l  = fig.add_axes([_lc_l, _top - _l_h,                           _lc_w, _l_h])
+    ax_tr = fig.add_axes([_rc_l, _top - _gap - _tr_h,                  _rc_w, _tr_h])
+    ax_br = fig.add_axes([_rc_l, _top - _gap - _tr_h - _gap - _br_h,   _rc_w, _br_h])
+
+    for ax, d in [(ax_l, d_l), (ax_tr, d_tr), (ax_br, d_br)]:
+        df  = cleaned[d]
+        y   = np.arange(n[d])
+        col = colours.get(d, {})
+        hat = (hatches or {}).get(d, {})
+
+        bar_colours = [col.get(m, "0.5") for m in df["model_id"]]
+        bars = ax.barh(y, df[metric], color=bar_colours, height=bar_height, align="center")
+
+        for bar, m in zip(bars, df["model_id"]):
+            bar.set_hatch(hat.get(m, ""))
+
+        ax.axvline(1.0, color="black", linewidth=1.2, linestyle="--")
+        ax.set_yticks(y)
+        ax.set_yticklabels(
+            [model_labels.get(m, m) if model_labels else m for m in df["model_id"]],
+            fontsize=8,
+        )
+        ax.set_ylim(-0.75, n[d] - 0.25)
+        ax.set_xlabel(metric_label, fontsize=9)
+        ax.set_title(d.upper())
+        ax.grid(True, axis="x", alpha=0.4)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+    if legend_entries:
+        handles = [
+            Patch(facecolor=fc, hatch=h, label=lbl)
+            for fc, h, lbl in legend_entries
+        ]
+        fig.legend(
+            handles=handles,
+            loc="lower center",
+            ncol=min(len(handles), 6),
+            fontsize=9,
+            bbox_to_anchor=(0.5, 0.08),
+        )
+
+    fig.suptitle(title)
     plt.show()
 
 
