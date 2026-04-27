@@ -1,0 +1,82 @@
+
+{
+  "covid": {
+    "target_column": "Total COVID-19 Admissions",
+    "cdc_metric_name": "wk inc covid hosp",
+    "ensemble_name": "Google_SAI-Ensemble",
+    "model_id_to_submission_name": {
+      "CMU_TimeSeries-UMass_gbqr": "Google_SAI-Hybrid_1",
+      "CMU_climate_baseline-UMass_ar6_pooled": "Google_SAI-Hybrid_2",
+      "CEPH_Rtrend_covid-CMU_climate_baseline": "Google_SAI-Hybrid_3",
+      "DeepResearch_RegimeSwitchingDetection": "Google_SAI-Novel_1",
+      "DeepResearch_CounterfactualSimulation": "Google_SAI-Novel_2",
+      "rep-UM-DeepOutbreak": "Google_SAI-Adapted_1",
+      "rep-MOBS-GLEAM_COVID": "Google_SAI-Adapted_2",
+      "rep-NEU_ISI-AdaptiveEnsemble": "Google_SAI-Adapted_3",
+      "rep-UMass-gbqr": "Google_SAI-Adapted_4",
+      "rep-CADPH-CovidCAT_Ensemble": "Google_SAI-Adapted_5",
+      "rep-UMass-ar6_pooled": "Google_SAI-Adapted_6",
+      "rep-CFA-EpiAutoGP": "Google_SAI-Adapted_7",
+      "rep-Metaculus-cp": "Google_SAI-Adapted_8",
+      "rep-UGA_flucast-INFLAenza": "Google_SAI-Adapted_9",
+      "rep-CMU-TimeSeries": "Google_SAI-Adapted_10",
+      "rep-JHU_CSSE-CSSE_Ensemble": "Google_SAI-Adapted_11",
+      "rep-CMU-climate_baseline": "Google_SAI-Adapted_12",
+      "rep-CEPH-Rtrend_covid": "Google_SAI-Adapted_13"
+    },
+    "model_names_for_ensemble": "rep-CADPH-CovidCAT_Ensemble,rep-UMass-gbqr,rep-UM-DeepOutbreak,rep-MOBS-GLEAM_COVID,rep-NEU_ISI-AdaptiveEnsemble,rep-DeepResearch_CounterfactualSimulation,CEPH_Rtrend_covid-CMU_climate_baseline,CMU_TimeSeries-UMass_gbqr,DeepResearch_RegimeSwitchingDetection,CMU_climate_baseline-UMass_ar6_pooled",
+    "observed_data_dir": "/cns/ok-d/home/gas/n=12.8/ttl=18262d/shamsiz/autokaggle/epidemiology/covid_2025_2026/kaggle_dataset/dataset_"
+  },
+  "flu": {
+    "target_column": "Total Influenza Admissions",
+    "cdc_metric_name": "wk inc flu hosp",
+    "ensemble_name": "Google_SAI-FluEns",
+    "model_id_to_submission_name": {
+      "rep-CFA_Pyrenew_Pyrenew_H_Flu": "Google_SAI-Adapted_1",
+      "rep-PSI_PROF": "Google_SAI-Adapted_2",
+      "rep-UGA_flucast-INFLAenza": "Google_SAI-Adapted_3",
+      "rep-UGA_flucast_Copycat": "Google_SAI-Adapted_4",
+      "rep-UGuelph_CompositeCurve": "Google_SAI-Adapted_5",
+      "rep-UMass-ar6_pooled": "Google_SAI-Adapted_6",
+      "rep-UMass-gbqr": "Google_SAI-Adapted_7",
+      "NU-PGF_FLUH": "Google_SAI-Adapted_8",
+      "Cornell_JHU-hierarchSIR": "Google_SAI-Adapted_9",
+      "PSI-PROF_MOA": "Google_SAI-Adapted_10",
+      "rep-UMass_Flusion": "Google_SAI-Adapted_11",
+      "rep-UVA_Gaussian_processes": "Google_SAI-Adapted_12",
+      "CMU_climate_baseline": "Google_SAI-Adapted_13",
+      "CMU_timeseries": "Google_SAI-Adapted_14",
+      "UMass_KCDE": "Google_SAI-Adapted_15",
+      "rep-CU_SIRS": "Google_SAI-Adapted_16",
+      "rep-PSI-PROF_MOA_v2": "Google_SAI-Adapted_17",
+      "Cornell_JHU-hierarchSIR_2": "Google_SAI-Adapted_18",
+      "rep-LANL_DBM": "Google_SAI-Adapted_19",
+      "NU-PGF_FLUH_v2": "Google_SAI-Adapted_20",
+      "rep-NU-PGF_FLUH_v3": "Google_SAI-Adapted_21",
+      "rep-NU-PGF_FLUH_v4": "Google_SAI-Adapted_22",
+      "rep-LANL_DBM_v2": "Google_SAI-Adapted_23",
+      "rep-LANL_DBM_v3": "Google_SAI-Adapted_24",
+      "rep-Cornell_JHU-hierarchSIR_v3": "Google_SAI-Adapted_25",
+      "rep-Cornell_JHU-hierarchSIR_v4": "Google_SAI-Adapted_26",
+      "LANL_DBM_and_LANL_Inferno": "Google_SAI-Hybrid_1",
+      "CMU_climate_baseline_and_UGA_flucast_Copycat": "Google_SAI-Hybrid_2",
+      "CU_SIRS_and_UVA_Gaussian_processes": "Google_SAI-Hybrid_3",
+      "CMU_climate_baseline_and_UGuelph_CompositeCurve": "Google_SAI-Hybrid_4",
+      "CU_SIRS_and_CMU_climate_baseline": "Google_SAI-Hybrid_5",
+      "LANL_DBM_and_UMass_Flusion": "Google_SAI-Hybrid_6",
+      "multi-layer-SE": "Google_SAI-Novel_1",
+      "Time_Series_to_Vision_Transfer_Learning": "Google_SAI-Novel_2"
+    },
+    "model_names_for_ensemble": "LANL_DBM_and_UMass_Flusion,LANL_DBM_and_LANL_Inferno,Cornell_JHU-hierarchSIR,UGA_flucast-INFLAenza,UMass_Flusion,CU_SIRS_and_CMU_climate_baseline,rep-NU-PGF_FLUH_v3"
+  },
+  "rsv": {
+    "target_column": "Total RSV Admissions",
+    "cdc_metric_name": "wk inc rsv hosp",
+    "ensemble_name": "Google_SAI-RSVEns",
+    "model_id_to_submission_name": {
+      "general_instruction_lgbm": "Google_SAI-Novel_1",
+      "general_instruction_2": "Google_SAI-Novel_2"
+    },
+    "model_names_for_ensemble": "general_instruction_lgbm,general_instruction_2"
+  }
+}

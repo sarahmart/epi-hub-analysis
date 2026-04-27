@@ -31,6 +31,7 @@ def plot_coverage_heatmap(
     all_horizons: list[int],
     n_locs: int,
     hub_label: str = "",
+    model_labels: dict | None = None,
 ) -> None:
     """
     Heatmap of submission coverage: proportion of locations submitted per
@@ -76,7 +77,10 @@ def plot_coverage_heatmap(
         ax.set_xticks(range(len(all_dates_hm)))
         ax.set_xticklabels(date_labels, rotation=90, fontsize=6.5)
         ax.set_yticks(range(len(model_order)))
-        ax.set_yticklabels(model_order, fontsize=8)
+        ax.set_yticklabels(
+            [model_labels.get(m, m) if model_labels else m for m in model_order],
+            fontsize=8,
+        )
         ax.grid(False)
 
     for j in range(len(all_horizons), len(axes)):
@@ -841,8 +845,10 @@ def plot_crosshub_rel_bars(
 
         ax.axvline(1.0, color="black", linewidth=1.2, linestyle="--")
         ax.set_yticks(y)
+        _lbl_d = (model_labels or {}).get(d)
+        _lbl = _lbl_d if isinstance(_lbl_d, dict) else (model_labels or {})
         ax.set_yticklabels(
-            [model_labels.get(m, m) if model_labels else m for m in df["model_id"]],
+            [_lbl.get(m, m) for m in df["model_id"]],
             fontsize=8,
         )
         ax.set_ylim(-0.75, n[d] - 0.25)
