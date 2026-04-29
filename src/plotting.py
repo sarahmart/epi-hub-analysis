@@ -32,6 +32,7 @@ def plot_coverage_heatmap(
     n_locs: int,
     hub_label: str = "",
     model_labels: dict | None = None,
+    save_path: str | None = None,
 ) -> None:
     """
     Heatmap of submission coverage: proportion of locations submitted per
@@ -59,7 +60,7 @@ def plot_coverage_heatmap(
     title = "Submission coverage: proportion of locations per (model, reference week)"
     if hub_label:
         title = f"{hub_label} — {title}"
-    fig.suptitle(f"{title}\nGrey = no submission", fontsize=11)
+    fig.suptitle(f"{title}\nGrey = no submission")
 
     im = None
     for i, h in enumerate(all_horizons):
@@ -73,13 +74,12 @@ def plot_coverage_heatmap(
             pivot.values, aspect="auto", vmin=0, vmax=1,
             cmap=cmap, interpolation="nearest",
         )
-        ax.set_title(f"Horizon {h:.0f}", fontsize=11)
+        ax.set_title(f"Horizon {h:.0f}")
         ax.set_xticks(range(len(all_dates_hm)))
-        ax.set_xticklabels(date_labels, rotation=90, fontsize=6.5)
+        ax.set_xticklabels(date_labels, rotation=90)
         ax.set_yticks(range(len(model_order)))
         ax.set_yticklabels(
             [model_labels.get(m, m) if model_labels else m for m in model_order],
-            fontsize=8,
         )
         ax.grid(False)
 
@@ -89,6 +89,8 @@ def plot_coverage_heatmap(
     if im is not None:
         fig.colorbar(im, ax=axes[:len(all_horizons)], shrink=0.5,
                      label="Proportion of locations submitted")
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight")
     plt.show()
 
 
@@ -104,6 +106,7 @@ def plot_season_bars(
     inches_per_bar: float = 0.32,
     min_fig_height: float = 3.5,
     top_bottom_pad: float = 0.35,
+    save_path: str | None = None,
 ) -> None:
     n = len(summary)
     fig_height = max(min_fig_height, n * inches_per_bar)
@@ -147,7 +150,6 @@ def plot_season_bars(
                     bar.get_y() + bar.get_height() / 2,
                     f"n={row['n_tasks']:,}",
                     va="center",
-                    fontsize=10,
                 )
 
         ax.set_xlabel(label)
@@ -155,6 +157,8 @@ def plot_season_bars(
         ax.set_xlim(0, s[metric].max() * 1.2)
         ax.grid(True, axis="x", alpha=0.4)
 
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight")
     plt.show()
 
 # WIS vs log WIS scatter (not super informative -- removed from notebooks)
@@ -163,6 +167,7 @@ def plot_wis_vs_logwis(
     all_summary: pd.DataFrame,
     model_colours: dict,
     eligibility_threshold: float,
+    save_path: str | None = None,
 ) -> None:
     """
     Scatter plot of season-average WIS vs log WIS for all models.
@@ -189,7 +194,7 @@ def plot_wis_vs_logwis(
         ax.annotate(
             row["model_id"],
             (row["mean_wis"], row["mean_log_wis"]),
-            fontsize=7, xytext=(4, 4), textcoords="offset points",
+            xytext=(4, 4), textcoords="offset points",
             alpha=0.9 if elig else 0.55,
         )
 
@@ -199,11 +204,13 @@ def plot_wis_vs_logwis(
         Line2D([0], [0], marker="s", color="w", markerfacecolor="dimgray",
                markersize=8, alpha=0.6, label="Ineligible"),
     ]
-    ax.legend(handles=handles, fontsize=9)
+    ax.legend(handles=handles)
     ax.set_xlabel("Season-average WIS")
     ax.set_ylabel("Season-average log WIS")
     ax.set_title("WIS vs log WIS by model")
     plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight")
     plt.show()
 
 
@@ -219,6 +226,7 @@ def plot_by_horizon(
     hub_label: str = "",
     main_model: str | None = None,
     main_model_colour: str | None = None,
+    save_path: str | None = None,
 ) -> None:
     """
     Two-panel line plot: mean WIS by horizon (left) and mean log WIS (right).
@@ -312,6 +320,8 @@ def plot_by_horizon(
         ax.legend(handles=legend_handles, loc="upper left")
 
     plt.suptitle(f"{prefix}top {top_n} eligible + hub models")
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight")
     plt.show()
 
 
@@ -325,6 +335,7 @@ def plot_weekly_scores(
     hub_label: str = "",
     main_model: str | None = None,
     main_model_colour: str | None = None,
+    save_path: str | None = None,
 ) -> None:
     """
     Two-panel time series: weekly mean WIS (top) and mean log WIS (bottom),
@@ -429,10 +440,11 @@ def plot_weekly_scores(
         handles=legend_handles,
         loc="lower center",
         ncol=len(legend_handles),
-        # fontsize=12,
         bbox_to_anchor=(0.5, -0.14),
     )
     plt.suptitle(f"{prefix}Weekly Mean Performance over Reference Dates")
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight")
     plt.show()
 
 
@@ -453,6 +465,7 @@ def plot_forecast_fans(
     subplot_height: float = 2.5,
     subplot_width: float = 3.2,
     plot_every_n: int = 1,
+    save_path: str | None = None,
 ) -> None:
     """
     Fan chart of quantile forecast intervals vs observed truth for every location.
@@ -482,7 +495,6 @@ def plot_forecast_fans(
                         sorted alphabetically by display name.
     exclude_locations : Set of location codes to omit from the default location
                         list. Defaults to {"US"} (national aggregate excluded).
-                        Pass an empty set to include all locations.
                         Has no effect when locations is supplied explicitly.
     ncols             : Number of subplot columns in the grid.
     inner_ci          : (low, high) quantile pair for the inner (darker) CI band.
@@ -634,6 +646,8 @@ def plot_forecast_fans(
     title = f"Incident weekly {hub_label} hospital admissions and GoogleSAI forecasts"
     fig.suptitle(title)
 
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight")
     plt.show()
 
 
@@ -654,6 +668,7 @@ def plot_combined_season_bars(
     bar_height: float = 0.7,
     inches_per_bar: float = 0.30,
     panel_gap: float = 1.5,
+    save_path: str | None = None,
 ) -> None:
     """
     Single-figure horizontal bar comparison across Flu, COVID-19 and RSV.
@@ -748,6 +763,8 @@ def plot_combined_season_bars(
         ax.grid(True, axis="x", alpha=0.4)
 
     fig.suptitle(f"Season-average {metric_label}")
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight")
     plt.show()
 
 
@@ -761,11 +778,12 @@ def plot_crosshub_rel_bars(
     legend_entries: list | None = None,
     metric: str = "rel_log_wis",
     metric_label: str = "Relative log WIS  (< 1 = better than baseline)",
-    title: str = "Cross-hub: Relative log WIS vs CDC ensemble (on common tasks)",
+    title: str = "Internal-hubs: Relative log WIS vs CDC ensemble (on common tasks)",
     diseases: list | None = None,
     bar_height: float = 0.7,
     inches_per_bar: float = 0.25,
     panel_gap: float = 1.0,
+    save_path: str | None = None,
 ) -> None:
     """
     Horizontal bar chart of a relative WIS metric across three diseases.
@@ -849,10 +867,9 @@ def plot_crosshub_rel_bars(
         _lbl = _lbl_d if isinstance(_lbl_d, dict) else (model_labels or {})
         ax.set_yticklabels(
             [_lbl.get(m, m) for m in df["model_id"]],
-            fontsize=8,
         )
         ax.set_ylim(-0.75, n[d] - 0.25)
-        ax.set_xlabel(metric_label, fontsize=9)
+        ax.set_xlabel(metric_label)
         ax.set_title(d.upper())
         ax.grid(True, axis="x", alpha=0.4)
         ax.spines["top"].set_visible(False)
@@ -867,11 +884,12 @@ def plot_crosshub_rel_bars(
             handles=handles,
             loc="lower center",
             ncol=min(len(handles), 6),
-            fontsize=9,
             bbox_to_anchor=(0.5, 0.08),
         )
 
     fig.suptitle(title)
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight")
     plt.show()
 
 
@@ -887,6 +905,7 @@ def plot_by_location(
     main_model: str | None = None,
     main_model_colour: str | None = None,
     inches_per_row: float = 0.25,
+    save_path: str | None = None,
 ) -> None:
     """
     Model performance per jurisdiction.
@@ -1025,6 +1044,8 @@ def plot_by_location(
         )
 
     fig.suptitle(f"{prefix}Model performance by jurisdiction")
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight")
     plt.show()
 
 
@@ -1041,13 +1062,14 @@ def plot_rank_distribution(
     show_n_tasks: bool = True,
     kde_max_height: float = 1,
     inches_per_row: float = 0.55,
+    save_path: str | None = None,
 ) -> None:
     """
     Plot of each model's distribution of standardised log WIS ranks,
     inspired by Fig. 2 of Cramer et al. (2022, PNAS).
 
     For every task (reference_date × horizon × location), all models with
-    a score in that group are ranked by `score_col` (ascending; lower is better).
+    a score are ranked by `score_col` (ascending; lower is better).
     The standardised rank maps rank 1 (best) → 1.0 and rank n (worst) → 0.0.
     The kernel density of each model's rank distribution is drawn as a filled
     ridgeline, coloured by quartile. Models are ordered by Q1 (descending) so
@@ -1206,8 +1228,8 @@ def plot_rank_distribution(
     prefix = f"{hub_label}: " if hub_label else ""
     ax.set_title(
         f"{prefix}Distribution of standardized {metric_label} ranks."
-        # f"Rank 1.0 = best {metric_label} for that location × horizon × week  |  "
-        # f"Models ordered by Q1 (↑ = rarely ranked poorly)",
     )
 
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight")
     plt.show()
