@@ -9,6 +9,7 @@ calls plt.show() at the end. Should work identically in each notebook.
 
 from __future__ import annotations
 
+import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -19,7 +20,7 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from src.colouring import GOOGLE_PINK
+from src.colouring import GOOGLE_PINK, HUB_BLACK, build_legend_entries
 
 # Coverage heatmap
 # TODO: sort models somehow? alphabetically or by coverage?
@@ -101,65 +102,118 @@ def plot_season_bars(
     model_colours: dict,
     model_hatches: dict | None = None,
     model_labels: dict | None = None,
+    legend_entries: list | None = None,
     include_n_tasks: bool = True,
-    bar_height: float = 0.8,
-    inches_per_bar: float = 0.32,
-    min_fig_height: float = 3.5,
-    top_bottom_pad: float = 0.35,
+    bar_width: float = 0.8,
+    inches_per_bar: float = 0.25,
+    min_fig_width: float = 6.0,
     save_path: str | None = None,
 ) -> None:
     n = len(summary)
-    fig_height = max(min_fig_height, n * inches_per_bar)
+
+    fig_width = max(min_fig_width, n * inches_per_bar * 2)
+
+    # Scale height and fonts for small-n plots
+    fig_height = min(6.0, max(4.2, 0.14 * n + 3.4))
+    small_plot = n <= 8
+
+    title_fs = 11 if small_plot else 14
+    label_fs = 10 if small_plot else 12
+    tick_fs = 8 if small_plot else 9
+    legend_fs = 9 if small_plot else 10
+    task_fs = 6 if small_plot else 7
 
     fig, axes = plt.subplots(
         1, 2,
-        figsize=(14, fig_height),
-        constrained_layout=True,
+        figsize=(fig_width, fig_height),
+        constrained_layout=False,
     )
 
-    y = np.arange(n)
-
     for ax, metric, label in [
-        (axes[0], "mean_wis", "Mean WIS"),
-        (axes[1], "mean_log_wis", "Mean log WIS"),
+        (axes[1], "mean_wis",     "Mean WIS"),
+        (axes[0], "mean_log_wis", "Mean log WIS"),
     ]:
         s = summary.sort_values(metric, ascending=True).reset_index(drop=True)
+        x = np.arange(len(s))
+
         bar_colours = [model_colours.get(m, "0.5") for m in s["model_id"]]
 
-        bars = ax.barh(
-            y,
+        bars = ax.bar(
+            x,
             s[metric],
             color=bar_colours,
-            height=bar_height,
+            width=bar_width,
             align="center",
+            edgecolor="white",
+            linewidth=0.5,
         )
 
         if model_hatches is not None:
             for bar, model_id in zip(bars, s["model_id"]):
                 bar.set_hatch(model_hatches.get(model_id, ""))
 
-        ax.set_yticks(y)
-        ax.set_yticklabels([model_labels.get(m, m) if model_labels else m for m in s["model_id"]])
-        ax.set_ylim(n - 0.5 + top_bottom_pad, -0.5 - top_bottom_pad)
+        ax.set_xticks(x)
+        ax.set_xticklabels(
+            [model_labels.get(m, m) if model_labels else m for m in s["model_id"]],
+            rotation=45,
+            ha="right",
+            fontsize=tick_fs,
+        )
 
         if include_n_tasks:
-            xpad = 0.01 * s[metric].max()
+            ypad = 0.01 * s[metric].max()
             for bar, (_, row) in zip(bars, s.iterrows()):
                 ax.text(
-                    bar.get_width() + xpad,
-                    bar.get_y() + bar.get_height() / 2,
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + ypad,
                     f"n={row['n_tasks']:,}",
-                    va="center",
+                    ha="center",
+                    va="bottom",
+                    fontsize=task_fs,
                 )
 
-        ax.set_xlabel(label)
-        ax.set_title(f"Season-average {label}")
-        ax.set_xlim(0, s[metric].max() * 1.2)
-        ax.grid(True, axis="x", alpha=0.4)
+        ax.set_ylabel(label, fontsize=label_fs)
+        ax.set_title(f"Season-average {label}", fontsize=title_fs, pad=8)
+        ax.set_ylim(0, s[metric].max() * 1.25)
+        ax.grid(True, axis="y", alpha=0.4)
+        ax.set_axisbelow(True)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+    if legend_entries is None:
+        legend_entries = build_legend_entries(model_colours, model_hatches)
+
+    if legend_entries:
+        handles = [
+            Patch(facecolor=fc, hatch=h, edgecolor="white", label=lbl)
+            for fc, h, lbl in legend_entries
+        ]
+
+        fig.legend(
+            handles=handles,
+            loc="lower center",
+            ncol=min(len(handles), 4 if small_plot else 6),
+            bbox_to_anchor=(0.5, 0.01),
+            fontsize=legend_fs,
+        )
+
+    # More bottom room for rotated tick labels and legend
+    fig.subplots_adjust(
+        left=0.08,
+        right=0.98,
+        top=0.88,
+        bottom=0.34 if small_plot else 0.28,
+        wspace=0.28,
+    )
 
     if save_path:
+        folder = os.path.dirname(save_path)
+        if folder:
+            os.makedirs(folder, exist_ok=True)
         plt.savefig(save_path, bbox_inches="tight")
+
     plt.show()
+
 
 # WIS vs log WIS scatter (not super informative -- removed from notebooks)
 
@@ -273,12 +327,12 @@ def plot_by_horizon(
     )
     hub_colour = next(
         (model_colours[m] for m in hub_set if m in model_colours),
-        "black",
+        HUB_BLACK,
     )
 
     for ax, data, top_models, hub_present, ylabel, title in [
-        (axes[0], by_hor_wis, top_by_wis, hub_in_wis, "Mean WIS",     "Mean WIS by horizon"),
-        (axes[1], by_hor_log, top_by_log, hub_in_log, "Mean log WIS", "Mean log WIS by horizon"),
+        (axes[1], by_hor_wis, top_by_wis, hub_in_wis, "Mean WIS",     "Mean WIS by horizon"),
+        (axes[0], by_hor_log, top_by_log, hub_in_log, "Mean log WIS", "Mean log WIS by horizon"),
     ]:
         for m in top_models:
             is_main = (m == main_model)
@@ -319,7 +373,8 @@ def plot_by_horizon(
         ax.set_xticks(all_horizons)
         ax.legend(handles=legend_handles, loc="upper left")
 
-    plt.suptitle(f"{prefix}top {top_n} eligible + hub models")
+    n_shown = len(top_by_wis)
+    plt.suptitle(f"{prefix}top {n_shown} eligible + hub models")
     if save_path:
         plt.savefig(save_path, bbox_inches="tight")
     plt.show()
@@ -369,14 +424,14 @@ def plot_weekly_scores(
     )
     hub_colour = next(
         (model_colours[m] for m in plot_models if m in hub_models),
-        "black",
+        HUB_BLACK,
     )
 
     fig, axes = plt.subplots(2, 1, figsize=(13, 8), constrained_layout=True, sharex=True)
 
     for ax, metric, ylabel, title in [
-        (axes[0], "wis",     "Mean WIS",     "WIS"),
-        (axes[1], "log_wis", "Mean log WIS", "log WIS"),
+        (axes[1], "wis",     "Mean WIS",     "WIS"),
+        (axes[0], "log_wis", "Mean log WIS", "log WIS"),
     ]:
         for m in plot_models:
             sub = weekly[weekly["model_id"] == m].sort_values("reference_date")
@@ -390,8 +445,9 @@ def plot_weekly_scores(
                 linestyle="--" if is_hub else "-",
                 linewidth=2.2 if is_hub else 1.5,
                 zorder=10 if is_main else (3 if is_hub else 2),
+                alpha=1 if is_main else (1 if is_hub else 0.5),
                 marker="o",
-                markersize=5,
+                markersize=6 if is_main else (5 if is_hub else 4),
             )
 
         ax.set_ylabel(ylabel)
@@ -440,7 +496,7 @@ def plot_weekly_scores(
         handles=legend_handles,
         loc="lower center",
         ncol=len(legend_handles),
-        bbox_to_anchor=(0.5, -0.14),
+        bbox_to_anchor=(0.5, -0.08),
     )
     plt.suptitle(f"{prefix}Weekly Mean Performance over Reference Dates")
     if save_path:
@@ -647,6 +703,8 @@ def plot_forecast_fans(
     fig.suptitle(title)
 
     if save_path:
+        folder = os.path.dirname(save_path)
+        os.makedirs(folder, exist_ok=True)
         plt.savefig(save_path, bbox_inches="tight")
     plt.show()
 
@@ -664,18 +722,18 @@ def plot_combined_season_bars(
     covid_hatches: dict | None = None,
     rsv_hatches: dict | None = None,
     model_labels: dict | None = None,
+    legend_entries: list | None = None,
     metric: str = "mean_log_wis",
-    bar_height: float = 0.7,
-    inches_per_bar: float = 0.30,
-    panel_gap: float = 1.5,
+    bar_width: float = 0.7,
+    inches_per_bar: float = 0.25,
     save_path: str | None = None,
 ) -> None:
     """
-    Single-figure horizontal bar comparison across Flu, COVID-19 and RSV.
+    Single-figure vertical bar comparison across Flu, COVID-19 and RSV.
 
-    Flu occupies the full left column. COVID and RSV are stacked in the right
-    column, separated by panel_gap inches. Every bar row has the same physical
-    height (inches_per_bar) across all three panels.
+    Flu spans the full top row. COVID-19 and RSV are shown below, side by side,
+    with width proportional to the number of models per infection. Models are
+    sorted ascending by metric (lowest/best at left).
 
     Parameters
     ----------
@@ -685,85 +743,92 @@ def plot_combined_season_bars(
         models) before passing. Sorted ascending by metric inside the function.
     flu_colours, covid_colours, rsv_colours
         dict mapping model_id → colour string.
+    legend_entries : Optional list of (facecolor, hatch, label) tuples for a
+                     shared figure legend.
     metric        : Column to plot — "mean_log_wis" (default) or "mean_wis".
-    bar_height    : Fractional bar height within each row (0–1).
-    inches_per_bar: Vertical inches allocated per model row.
-    panel_gap     : Inches of whitespace between the COVID-19 and RSV panels.
+    bar_width     : Fractional bar width within each column (0–1).
+    inches_per_bar: Horizontal inches allocated per model column.
     """
     n_flu   = len(flu_summary)
     n_covid = len(covid_summary)
     n_rsv   = len(rsv_summary)
+    n_total = n_flu + n_covid + n_rsv
 
     metric_label = "Mean log WIS" if "log" in metric else "Mean WIS"
 
-    _title_h = 0.75   # inches reserved for suptitle above plot area
-    _xlab_h  = 0.55   # inches reserved for x-label / tick labels below axes
+    fig_width  = max(10, n_total * inches_per_bar + 2)
+    fig_height = 8 + (0.6 if legend_entries else 0)
 
-    # Content height: tallest column (bars only) + gap between COVID and RSV
-    n_right = n_covid + n_rsv
-    content_h = max(n_flu, n_right) * inches_per_bar + panel_gap
-    fig_height = max(4.5, content_h + _title_h + _xlab_h)
+    fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=True)
+    gs = fig.add_gridspec(
+        2, 2,
+        height_ratios=[1, 1],
+        width_ratios=[n_covid, n_rsv],
+    )
 
-    fig = plt.figure(figsize=(14, fig_height))
+    axes = [
+        fig.add_subplot(gs[0, :]),  # flu spans full width
+        fig.add_subplot(gs[1, 0]),  # covid bottom-left
+        fig.add_subplot(gs[1, 1]),  # rsv bottom-right
+    ]
 
-    # Column x-positions (figure fractions)
-    # Reproduces GridSpec(left=0.16, right=0.97, wspace=0.5) geometry:
-    #   col_w = (0.97 - 0.16) / 2.5;  gap = 0.5 * col_w
-    _lft, _rgt = 0.16, 0.97
-    _col_w = (_rgt - _lft) / 2.5          # ≈ 0.324
-    _lc_l  = _lft                          # left column left edge
-    _lc_w  = _col_w
-    _rc_l  = _lft + 1.5 * _col_w          # right column left edge  ≈ 0.646
-    _rc_w  = _rgt - _rc_l
-
-    # Row y-positions (figure fractions, measured from bottom)
-    _top = (fig_height - _title_h) / fig_height   # top of plot area
-
-    # Flu: full left column, anchored at top
-    _flu_h   = n_flu   * inches_per_bar / fig_height
-    _flu_top = _top
-    _flu_bot = _flu_top - _flu_h
-
-    # COVID: right column, anchored at top
-    _cov_h   = n_covid * inches_per_bar / fig_height
-    _cov_top = _top - panel_gap / fig_height
-    _cov_bot = _cov_top - _cov_h
-
-    # RSV: below COVID, separated by panel_gap
-    _rsv_h   = n_rsv   * inches_per_bar / fig_height
-    _rsv_top = _cov_bot - panel_gap / fig_height
-    _rsv_bot = _rsv_top - _rsv_h
-
-    ax_flu   = fig.add_axes([_lc_l, _flu_bot, _lc_w, _flu_h])
-    ax_covid = fig.add_axes([_rc_l, _cov_bot, _rc_w, _cov_h])
-    ax_rsv   = fig.add_axes([_rc_l, _rsv_bot, _rc_w, _rsv_h])
-
-    # Draw bars
     for ax, summary, colours, hatches, label in [
-        (ax_flu,   flu_summary,   flu_colours,   flu_hatches,   "FluSight Forecast Hub"),
-        (ax_covid, covid_summary, covid_colours, covid_hatches, "COVIDHub"),
-        (ax_rsv,   rsv_summary,   rsv_colours,   rsv_hatches,   "RSVHub"),
+        (axes[0], flu_summary,   flu_colours,   flu_hatches,   "FluSight Forecast Hub"),
+        (axes[1], covid_summary, covid_colours, covid_hatches, "COVIDHub"),
+        (axes[2], rsv_summary,   rsv_colours,   rsv_hatches,   "RSVHub"),
     ]:
-        s = summary.sort_values(metric, ascending=False).reset_index(drop=True)
+        s = summary.sort_values(metric, ascending=True).reset_index(drop=True)
         n = len(s)
-        y = np.arange(n)
+        x = np.arange(n)
         colors = [colours.get(m, "0.5") for m in s["model_id"]]
 
-        bars = ax.barh(y, s[metric], color=colors, height=bar_height, align="center")
+        bars = ax.bar(
+            x, s[metric],
+            color=colors, width=bar_width, align="center",
+            edgecolor="white", linewidth=0.5,
+        )
 
         if hatches is not None:
             for bar, model_id in zip(bars, s["model_id"]):
                 bar.set_hatch(hatches.get(model_id, ""))
-        ax.set_yticks(y)
-        ax.set_yticklabels([model_labels.get(m, m) if model_labels else m for m in s["model_id"]])
-        ax.set_ylim(-0.75, n - 0.25)
+
+        ax.set_xticks(x)
+        ax.set_xticklabels(
+            [model_labels.get(m, m) if model_labels else m for m in s["model_id"]],
+            rotation=45, ha="right",
+        )
         ax.set_title(label, pad=5)
-        ax.set_xlim(0, s[metric].max() * 1.15)
-        ax.set_xlabel(metric_label)
-        ax.grid(True, axis="x", alpha=0.4)
+        ax.set_ylim(0, s[metric].max() * 1.15)
+        ax.grid(True, axis="y", alpha=0.4)
+        ax.set_axisbelow(True)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+    axes[0].set_ylabel(metric_label)
+    axes[1].set_ylabel(metric_label)
+    axes[2].set_ylabel("")
+
+    if legend_entries is None:
+        _all_colours = {**flu_colours, **covid_colours, **rsv_colours}
+        _all_hatches = {**(flu_hatches or {}), **(covid_hatches or {}), **(rsv_hatches or {})}
+        legend_entries = build_legend_entries(_all_colours, _all_hatches)
+    if legend_entries:
+        handles = [
+            Patch(facecolor=fc, hatch=h, edgecolor="white", label=lbl)
+            for fc, h, lbl in legend_entries
+        ]
+        fig.legend(
+            handles=handles,
+            loc="lower center",
+            ncol=min(len(handles), 6),
+            bbox_to_anchor=(0.5, -0.08),
+        )
 
     fig.suptitle(f"Season-average {metric_label}")
     if save_path:
+        folder = os.path.dirname(save_path)
+        if folder:
+            os.makedirs(folder, exist_ok=True)
         plt.savefig(save_path, bbox_inches="tight")
     plt.show()
 
@@ -777,114 +842,117 @@ def plot_crosshub_rel_bars(
     model_labels: dict | None = None,
     legend_entries: list | None = None,
     metric: str = "rel_log_wis",
-    metric_label: str = "Relative log WIS  (< 1 = better than baseline)",
-    title: str = "Internal-hubs: Relative log WIS vs CDC ensemble (on common tasks)",
+    metric_label: str = "Relative log WIS", #   (< 1 = better than FluSight ensemble)
+    title: str = "Relative log WIS vs CDC ensemble (on common tasks)",
     diseases: list | None = None,
-    bar_height: float = 0.7,
+    bar_width: float = 0.7,
     inches_per_bar: float = 0.25,
-    panel_gap: float = 1.0,
     save_path: str | None = None,
 ) -> None:
     """
-    Horizontal bar chart of a relative WIS metric across three diseases.
+    Vertical bar chart of a relative WIS metric across three diseases.
 
-    Layout mirrors plot_combined_season_bars: the first disease occupies the
-    full left column; the second and third are stacked in the right column,
-    separated by panel_gap inches. Bar physical height is equal across panels.
+    Three side-by-side panels with width proportional to number of models per
+    disease. A horizontal dashed reference line marks relative WIS = 1 (parity
+    with baseline). Models are sorted ascending by metric (lowest/best at left).
 
     Parameters
     ----------
     summaries      : dict disease → DataFrame containing model_id and metric.
     colours        : dict disease → {model_id: colour}.
     hatches        : dict disease → {model_id: hatch pattern}.
-    model_labels   : Optional {model_id: display_name} applied to y-tick labels.
+    model_labels   : Optional {model_id: display_name} applied to x-tick labels.
     legend_entries : Optional list of (facecolor, hatch, label) tuples used to
-                     build the shared figure legend. Edit labels freely here —
-                     colours and hatches are set independently of the bars, so
-                     entries that share a colour can carry distinct labels.
+                     build the shared figure legend.
     metric         : Column name to plot (default "rel_log_wis").
-    metric_label   : x-axis label.
+    metric_label   : y-axis label.
     title          : Figure suptitle.
-    diseases       : Ordered list of three disease keys — [left, top-right, bot-right].
+    diseases       : Ordered list of three disease keys.
                      Defaults to the order of summaries.keys().
-    bar_height     : Fractional bar height within each row (0–1).
-    inches_per_bar : Physical inches allocated per model row.
-    panel_gap      : Vertical inches between the two right-column panels.
+    bar_width      : Fractional bar width within each column (0–1).
+    inches_per_bar : Physical inches allocated per model column.
     """
     if diseases is None:
         diseases = list(summaries.keys())
-    d_l, d_tr, d_br = diseases[0], diseases[1], diseases[2]
+    d_0, d_1, d_2 = diseases[0], diseases[1], diseases[2]
 
     cleaned = {
         d: (summaries[d]
             .dropna(subset=[metric])
-            .sort_values(metric, ascending=False)
+            .sort_values(metric, ascending=True)
             .reset_index(drop=True))
         for d in diseases
     }
     n = {d: len(cleaned[d]) for d in diseases}
+    n_total = sum(n.values())
 
-    _title_h = 0.75
-    _xlab_h  = 1.1 if legend_entries else 0.55
+    fig_width  = max(10, n_total * inches_per_bar + 2)
+    fig_height = 8 + (0.6 if legend_entries else 0)
 
-    content_h  = max(n[d_l], n[d_tr] + n[d_br]) * inches_per_bar + panel_gap
-    fig_height = max(4.5, content_h + _title_h + _xlab_h)
+    fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=True)
+    gs = fig.add_gridspec(
+        2, 2,
+        height_ratios=[1, 1],
+        width_ratios=[n[d_1], n[d_2]],
+    )
 
-    fig = plt.figure(figsize=(14, fig_height))
+    axes = [
+        fig.add_subplot(gs[0, :]),  # flu spans full width
+        fig.add_subplot(gs[1, 0]),  # covid bottom-left
+        fig.add_subplot(gs[1, 1]),  # rsv bottom-right
+    ]
 
-    # Column geometry — identical to plot_combined_season_bars
-    _lft, _rgt = 0.16, 0.97
-    _col_w = (_rgt - _lft) / 2.5
-    _lc_l, _lc_w = _lft, _col_w
-    _rc_l, _rc_w = _lft + 1.5 * _col_w, _rgt - (_lft + 1.5 * _col_w)
-
-    _top = (fig_height - _title_h) / fig_height
-
-    _l_h    = n[d_l]  * inches_per_bar / fig_height
-    _tr_h   = n[d_tr] * inches_per_bar / fig_height
-    _br_h   = n[d_br] * inches_per_bar / fig_height
-    _gap    = panel_gap / fig_height
-
-    ax_l  = fig.add_axes([_lc_l, _top - _l_h,                           _lc_w, _l_h])
-    ax_tr = fig.add_axes([_rc_l, _top - _gap - _tr_h,                  _rc_w, _tr_h])
-    ax_br = fig.add_axes([_rc_l, _top - _gap - _tr_h - _gap - _br_h,   _rc_w, _br_h])
-
-    for ax, d in [(ax_l, d_l), (ax_tr, d_tr), (ax_br, d_br)]:
+    for ax, d in zip(axes, diseases):
         df  = cleaned[d]
-        y   = np.arange(n[d])
+        x   = np.arange(n[d])
         col = colours.get(d, {})
         hat = (hatches or {}).get(d, {})
 
         bar_colours = [col.get(m, "0.5") for m in df["model_id"]]
-        bars = ax.barh(y, df[metric], color=bar_colours, height=bar_height, align="center")
+        bars = ax.bar(
+            x, df[metric],
+            color=bar_colours, width=bar_width, align="center",
+            edgecolor="white", linewidth=0.5,
+        )
 
         for bar, m in zip(bars, df["model_id"]):
             bar.set_hatch(hat.get(m, ""))
+        
+        if d in (d_0, d_1):
+            ax.set_ylabel(metric_label)
+        else:
+            ax.set_ylabel("")
 
-        ax.axvline(1.0, color="black", linewidth=1.2, linestyle="--")
-        ax.set_yticks(y)
+        ax.axhline(1.0, color="black", linewidth=1.2, linestyle="--")
+        ax.set_xticks(x)
         _lbl_d = (model_labels or {}).get(d)
         _lbl = _lbl_d if isinstance(_lbl_d, dict) else (model_labels or {})
-        ax.set_yticklabels(
+        ax.set_xticklabels(
             [_lbl.get(m, m) for m in df["model_id"]],
+            rotation=45, ha="right",
         )
-        ax.set_ylim(-0.75, n[d] - 0.25)
-        ax.set_xlabel(metric_label)
+        ax.set_ylim(0, df[metric].max() * 1.2)
+        ax.set_ylabel(metric_label)
         ax.set_title(d.upper())
-        ax.grid(True, axis="x", alpha=0.4)
+        ax.grid(True, axis="y", alpha=0.4)
+        ax.set_axisbelow(True)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
+    if legend_entries is None:
+        _all_colours = {m: c for d_c in colours.values() for m, c in d_c.items()}
+        _all_hatches = {m: h for d_h in (hatches or {}).values() for m, h in d_h.items()}
+        legend_entries = build_legend_entries(_all_colours, _all_hatches)
     if legend_entries:
         handles = [
-            Patch(facecolor=fc, hatch=h, label=lbl)
+            Patch(facecolor=fc, hatch=h, edgecolor="white", label=lbl)
             for fc, h, lbl in legend_entries
         ]
         fig.legend(
             handles=handles,
             loc="lower center",
             ncol=min(len(handles), 6),
-            bbox_to_anchor=(0.5, 0.08),
+            bbox_to_anchor=(0.5, -0.08),
         )
 
     fig.suptitle(title)
@@ -902,6 +970,7 @@ def plot_by_location(
     hub_models: set | None = None,
     top_n: int = 100,
     hub_label: str = "",
+    hub_legend_label: str = "Hub models (ensemble + baseline)",
     main_model: str | None = None,
     main_model_colour: str | None = None,
     inches_per_row: float = 0.25,
@@ -921,6 +990,7 @@ def plot_by_location(
     hub_models        : Set of hub model IDs (always included, distinct style).
     top_n             : Max non-hub eligible models to include.
     hub_label         : Short hub name for the figure suptitle.
+    hub_legend_label  : Shared legend label for all hub models.
     main_model        : Model ID to emphasise (large diamond, distinct colour).
     main_model_colour : Optional colour override for main_model.
     inches_per_row    : Figure height per location row.
@@ -954,8 +1024,8 @@ def plot_by_location(
     )
 
     for ax, data, xlabel, panel_title in [
-        (axes[0], by_loc_wis, "Mean WIS",     "Mean WIS by jurisdiction"),
-        (axes[1], by_loc_log, "Mean log WIS", "Mean log WIS by jurisdiction"),
+        (axes[1], by_loc_wis, "Mean WIS",     "Mean WIS by jurisdiction"),
+        (axes[0], by_loc_log, "Mean log WIS", "Mean log WIS by jurisdiction"),
     ]:
         avail = [loc for loc in sorted_locs if loc in data.columns]
         sub = data.loc[[m for m in plot_models if m in data.index], avail]
@@ -981,9 +1051,9 @@ def plot_by_location(
             is_hub  = (m in hub_set)
             color   = _main_colour if is_main else model_colours.get(m, "0.5")
             marker  = "D" if is_main else ("s" if is_hub else "o")
-            size    = 55  if is_main else (35  if is_hub else 30)
+            size    = 55  if is_main else (30  if is_hub else 25)
             zorder  = 5   if is_main else (4   if is_hub else 2)
-            alpha   = 1.0 if (is_main or is_hub) else 0.75
+            alpha   = 1.0 if (is_main or is_hub) else 0.65
 
             valid = [
                 (y_map[loc], sub.loc[m, loc])
@@ -1018,14 +1088,17 @@ def plot_by_location(
             markersize=8, markeredgecolor="white", markeredgewidth=0.5,
             label=main_model,
         ))
-    for m in hub_in:
-        if m == main_model:
-            continue
+
+    hub_others = [m for m in hub_in if m != main_model]
+    if hub_others:
+        _hc = next((model_colours[m] for m in hub_others if m in model_colours), "black")
         legend_handles.append(Line2D(
             [0], [0], marker="s", color="w",
-            markerfacecolor=model_colours.get(m, "black"),
-            markersize=8, label=m,
+            markerfacecolor=_hc,
+            markersize=8,
+            label=hub_legend_label,
         ))
+
     others = [m for m in top_eligible if m != main_model]
     if others:
         _oc = next((model_colours[m] for m in others if m in model_colours), "0.5")
@@ -1045,6 +1118,9 @@ def plot_by_location(
 
     fig.suptitle(f"{prefix}Model performance by jurisdiction")
     if save_path:
+        folder = os.path.dirname(save_path)
+        if folder:
+            os.makedirs(folder, exist_ok=True)
         plt.savefig(save_path, bbox_inches="tight")
     plt.show()
 
@@ -1138,13 +1214,11 @@ def plot_rank_distribution(
         # Quartile cuts from actual data
         q25, q50, q75 = np.percentile(data, [25, 50, 75])
 
-        # Build x grid that includes exact quartile positions so band
-        # boundaries are pixel-perfect with no gaps between colours
         x_eval = np.sort(np.unique(np.concatenate([
             np.linspace(0, 1, 300), [q25, q50, q75],
         ])))
 
-        # KDE using Scott's rule, numpy only (no scipy dependency)
+        # KDE using Scott's rule
         h = max(1.06 * np.std(data) * len(data) ** -0.2, 1e-3)
         diff = (x_eval[:, None] - data[None, :]) / h
         y_raw = np.exp(-0.5 * diff ** 2).mean(axis=1) / (h * np.sqrt(2 * np.pi))
@@ -1166,8 +1240,7 @@ def plot_rank_distribution(
                     color=color, linewidth=0, zorder=2,
                 )
 
-        # Ridge outline — closed polygon that drops back to y_base at both
-        # edges so the curve doesn't float open at x=0 and x=1
+        # Ridge outline — closed polygon
         x_closed = np.concatenate([[0.0], x_eval, [1.0]])
         y_closed = np.concatenate([[y_base], y_kde, [y_base]])
         is_main = (model == main_model)
@@ -1220,7 +1293,7 @@ def plot_rank_distribution(
     _ax_h = max(2.0, n_models * inches_per_row)
     ax.legend(
         handles=legend_handles, title="Rank Quartile",
-        loc="upper center", bbox_to_anchor=(0.5, -0.42 / _ax_h),
+        loc="upper center", bbox_to_anchor=(0.5, -0.45 / _ax_h),
         ncol=4, frameon=True,
     )
 
