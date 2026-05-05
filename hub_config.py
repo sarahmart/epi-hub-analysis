@@ -103,7 +103,7 @@ FLU_HUB = HubConfig(
         "FluSight-HJudge_ensemble",
         "FluSight-lop_norm",
         "FluSight-trained_mean",
-        # "FluSight-trained_median",
+        "FluSight-trained_med",
     ),
 )
 
