@@ -193,7 +193,7 @@ def plot_season_bars(
             handles=handles,
             loc="lower center",
             ncol=min(len(handles), 4 if small_plot else 6),
-            bbox_to_anchor=(0.5, 0.01),
+            bbox_to_anchor=(0.5, -0.08),
             fontsize=legend_fs,
         )
 
@@ -757,7 +757,7 @@ def plot_combined_season_bars(
     metric_label = "Mean log WIS" if "log" in metric else "Mean WIS"
 
     fig_width  = max(10, n_total * inches_per_bar + 2)
-    fig_height = 8 + (0.6 if legend_entries else 0)
+    fig_height = 10 + (5 if legend_entries else 0)
 
     fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=True)
     gs = fig.add_gridspec(
@@ -821,7 +821,7 @@ def plot_combined_season_bars(
             handles=handles,
             loc="lower center",
             ncol=min(len(handles), 6),
-            bbox_to_anchor=(0.5, -0.08),
+            bbox_to_anchor=(0.5, -0.03),
         )
 
     fig.suptitle(f"Season-average {metric_label}")
@@ -887,7 +887,7 @@ def plot_crosshub_rel_bars(
     n_total = sum(n.values())
 
     fig_width  = max(10, n_total * inches_per_bar + 2)
-    fig_height = 8 + (0.6 if legend_entries else 0)
+    fig_height = 10 + (5 if legend_entries else 0)
 
     fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=True)
     gs = fig.add_gridspec(
@@ -952,7 +952,7 @@ def plot_crosshub_rel_bars(
             handles=handles,
             loc="lower center",
             ncol=min(len(handles), 6),
-            bbox_to_anchor=(0.5, -0.08),
+            bbox_to_anchor=(0.5, -0.01),
         )
 
     fig.suptitle(title)

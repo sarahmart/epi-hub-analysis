@@ -8,9 +8,9 @@ OVERALL HUB APPEARANCES
 * Google_SAI ensemble : darker blue
 * Google internal models: 
     * Adapted : solid blue
-    * Hybrid  : diagonal blue (bottom left to top right)
+    * Hybrid  : diagonal blue //
     * Novel   : cross-hatch blue (both diagonals)
-* Hub-generated models (ensembles and baselines): red diagonal hatch (bottom left to top right)
+* Hub-generated models (ensembles and baselines): red diagonal hatch //
 * Hub-submitting models : red solid
 """
 
@@ -18,7 +18,7 @@ OVERALL HUB APPEARANCES
 # HUB COLOURS — match previous paper colour + hatching scheme
 HUB = "#c0392b"              # models from external hubs (submitting and baselines)
 GOOGLE_INTERNAL = "#2471a3"  # Google internal models
-SAI_ENSEMBLE = "#2437ae"     # main SAI ensemble
+SAI_ENSEMBLE = "#011773"     # main SAI ensemble
 
 GREEN = "#17b248"
 GOOGLE_PINK = SAI_ENSEMBLE   # main SAI hub submission; alias kept for notebook compatibility
