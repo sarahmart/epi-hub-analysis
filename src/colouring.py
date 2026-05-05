@@ -142,7 +142,7 @@ def build_legend_entries(
 def is_hub_generated_model(model_id: str) -> bool:
     ml = str(model_id).lower()
     return (
-        ("ensemble" in ml or "baseline" in ml or "flusight" in ml)
+        ("flusight" in ml or "covidhub" in ml or "rsvhub" in ml)
         and "google" not in ml
         and "sai" not in ml
     )
