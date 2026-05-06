@@ -104,24 +104,16 @@ def plot_season_bars(
     model_labels: dict | None = None,
     legend_entries: list | None = None,
     include_n_tasks: bool = True,
-    bar_width: float = 0.8,
-    inches_per_bar: float = 0.25,
+    bar_width: float = 0.7,
+    inches_per_bar: float = 0.3,
     min_fig_width: float = 6.0,
     save_path: str | None = None,
 ) -> None:
+    
     n = len(summary)
-
-    fig_width = max(min_fig_width, n * inches_per_bar * 2)
-
-    # Scale height and fonts for small-n plots
-    fig_height = min(6.0, max(4.2, 0.14 * n + 3.4))
+    fig_width = max(min_fig_width, 9.0 if n <= 8 else n * inches_per_bar * 2.4)
+    fig_height = min(6.0, max(6, 0.2 * n + 3.4))
     small_plot = n <= 8
-
-    title_fs = 11 if small_plot else 14
-    label_fs = 10 if small_plot else 12
-    tick_fs = 8 if small_plot else 9
-    legend_fs = 9 if small_plot else 10
-    task_fs = 6 if small_plot else 7
 
     fig, axes = plt.subplots(
         1, 2,
@@ -155,9 +147,8 @@ def plot_season_bars(
         ax.set_xticks(x)
         ax.set_xticklabels(
             [model_labels.get(m, m) if model_labels else m for m in s["model_id"]],
-            rotation=45,
+            rotation=60,
             ha="right",
-            fontsize=tick_fs,
         )
 
         if include_n_tasks:
@@ -169,11 +160,10 @@ def plot_season_bars(
                     f"n={row['n_tasks']:,}",
                     ha="center",
                     va="bottom",
-                    fontsize=task_fs,
                 )
 
-        ax.set_ylabel(label, fontsize=label_fs)
-        ax.set_title(f"Season-average {label}", fontsize=title_fs, pad=8)
+        ax.set_ylabel(label)
+        ax.set_title(f"Season-average {label}", pad=8)
         ax.set_ylim(0, s[metric].max() * 1.25)
         ax.grid(True, axis="y", alpha=0.4)
         ax.set_axisbelow(True)
@@ -193,8 +183,7 @@ def plot_season_bars(
             handles=handles,
             loc="lower center",
             ncol=min(len(handles), 4 if small_plot else 6),
-            bbox_to_anchor=(0.5, -0.08),
-            fontsize=legend_fs,
+            bbox_to_anchor=(0.5, -0.32 if small_plot else -0.7), # works for covid and rsv, flu needs even more space
         )
 
     # More bottom room for rotated tick labels and legend
@@ -203,7 +192,7 @@ def plot_season_bars(
         right=0.98,
         top=0.88,
         bottom=0.34 if small_plot else 0.28,
-        wspace=0.28,
+        wspace=0.45 if small_plot else 0.28
     )
 
     if save_path:
@@ -371,7 +360,12 @@ def plot_by_horizon(
         ax.set_ylabel(ylabel)
         ax.set_title(f"{title}  ")
         ax.set_xticks(all_horizons)
-        ax.legend(handles=legend_handles, loc="upper left")
+        fig.legend(
+            handles=legend_handles,
+            loc="lower center",
+            ncol=len(legend_handles),
+            bbox_to_anchor=(0.5, -0.13),
+        )
 
     n_shown = len(top_by_wis)
     plt.suptitle(f"{prefix}top {n_shown} eligible + hub models")
@@ -822,7 +816,7 @@ def plot_combined_season_bars(
         fig.legend(
             handles=handles,
             loc="lower center",
-            ncol=min(len(handles), 6),
+            ncol=min(len(handles), 3),
             bbox_to_anchor=(0.5, -0.06),
         )
 
@@ -850,6 +844,7 @@ def plot_crosshub_rel_bars(
     bar_width: float = 0.7,
     inches_per_bar: float = 0.25,
     save_path: str | None = None,
+    buffer: float = 0.0,
 ) -> None:
     """
     Vertical bar chart of a relative WIS metric across three diseases.
@@ -889,7 +884,7 @@ def plot_crosshub_rel_bars(
     n_total = sum(n.values())
 
     fig_width  = max(10, n_total * inches_per_bar + 2)
-    fig_height = 10 + (5 if legend_entries else 0)
+    fig_height = 10 + (5 + 10*buffer if legend_entries else 0)
 
     fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=True)
     gs = fig.add_gridspec(
@@ -954,7 +949,7 @@ def plot_crosshub_rel_bars(
             handles=handles,
             loc="lower center",
             ncol=min(len(handles), 3),
-            bbox_to_anchor=(0.5, -0.05),
+            bbox_to_anchor=(0.5, -0.05 - buffer),
         )
 
     # fig.suptitle(title)
