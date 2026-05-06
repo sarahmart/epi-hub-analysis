@@ -515,11 +515,11 @@ def plot_forecast_fans(
     location_names: dict | None = None,
     locations: list[str] | None = None,
     exclude_locations: set[str] | None = None,
-    ncols: int = 6,
+    ncols: int = 4,
     inner_ci: tuple[float, float] = (0.25, 0.75),
     outer_ci: tuple[float, float] = (0.025, 0.975),
-    subplot_height: float = 2.5,
-    subplot_width: float = 3.2,
+    subplot_height: float = 2.2,
+    subplot_width: float = 3.4,
     plot_every_n: int = 1,
     save_path: str | None = None,
 ) -> None:
@@ -667,9 +667,9 @@ def plot_forecast_fans(
         ax.set_title(loc_name, pad=2)
         ax.tick_params(axis="both")
         ax.xaxis.set_major_formatter(mdates.DateFormatter("%b"))
-        ax.xaxis.set_major_locator(mdates.MonthLocator())
+        ax.xaxis.set_major_locator(mdates.MonthLocator(interval=2))
         ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:,.0f}"))
-        ax.grid(True, alpha=0.3)
+        ax.tick_params(axis="x", rotation=45)
 
     # Hide unused axes
     for j in range(len(locations), len(axes_flat)):
@@ -700,7 +700,7 @@ def plot_forecast_fans(
     )
 
     title = f"Incident weekly {hub_label} hospital admissions and GoogleSAI forecasts"
-    fig.suptitle(title)
+    # fig.suptitle(title)
 
     if save_path:
         folder = os.path.dirname(save_path)
@@ -757,7 +757,7 @@ def plot_combined_season_bars(
     metric_label = "Mean log WIS" if "log" in metric else "Mean WIS"
 
     fig_width  = max(10, n_total * inches_per_bar + 2)
-    fig_height = 10 + (5 if legend_entries else 0)
+    fig_height = 10 + (15 if legend_entries else 0)
 
     fig = plt.figure(figsize=(fig_width, fig_height), constrained_layout=True)
     gs = fig.add_gridspec(
@@ -772,10 +772,10 @@ def plot_combined_season_bars(
         fig.add_subplot(gs[1, 1]),  # rsv bottom-right
     ]
 
-    for ax, summary, colours, hatches, label in [
-        (axes[0], flu_summary,   flu_colours,   flu_hatches,   "FluSight Forecast Hub"),
-        (axes[1], covid_summary, covid_colours, covid_hatches, "COVIDHub"),
-        (axes[2], rsv_summary,   rsv_colours,   rsv_hatches,   "RSVHub"),
+    for ax, d, summary, colours, hatches, label in [
+        (axes[0], "flu",   flu_summary,   flu_colours,   flu_hatches,   "FluSight Forecast Hub"),
+        (axes[1], "covid", covid_summary, covid_colours, covid_hatches, "COVIDHub"),
+        (axes[2], "rsv",   rsv_summary,   rsv_colours,   rsv_hatches,   "RSVHub"),
     ]:
         s = summary.sort_values(metric, ascending=True).reset_index(drop=True)
         n = len(s)
@@ -793,8 +793,10 @@ def plot_combined_season_bars(
                 bar.set_hatch(hatches.get(model_id, ""))
 
         ax.set_xticks(x)
+        _lbl_d = (model_labels or {}).get(d)
+        _lbl = _lbl_d if isinstance(_lbl_d, dict) else (model_labels or {})
         ax.set_xticklabels(
-            [model_labels.get(m, m) if model_labels else m for m in s["model_id"]],
+            [_lbl.get(m, m) for m in s["model_id"]],
             rotation=45, ha="right",
         )
         ax.set_title(label, pad=5)
@@ -821,10 +823,10 @@ def plot_combined_season_bars(
             handles=handles,
             loc="lower center",
             ncol=min(len(handles), 6),
-            bbox_to_anchor=(0.5, -0.03),
+            bbox_to_anchor=(0.5, -0.06),
         )
 
-    fig.suptitle(f"Season-average {metric_label}")
+    # fig.suptitle(f"Season-average {metric_label}")
     if save_path:
         folder = os.path.dirname(save_path)
         if folder:
@@ -933,7 +935,7 @@ def plot_crosshub_rel_bars(
         )
         ax.set_ylim(0, df[metric].max() * 1.2)
         ax.set_ylabel(metric_label)
-        ax.set_title(d.upper())
+        ax.set_title(d)
         ax.grid(True, axis="y", alpha=0.4)
         ax.set_axisbelow(True)
         ax.spines["top"].set_visible(False)
@@ -951,11 +953,11 @@ def plot_crosshub_rel_bars(
         fig.legend(
             handles=handles,
             loc="lower center",
-            ncol=min(len(handles), 6),
-            bbox_to_anchor=(0.5, -0.01),
+            ncol=min(len(handles), 3),
+            bbox_to_anchor=(0.5, -0.05),
         )
 
-    fig.suptitle(title)
+    # fig.suptitle(title)
     if save_path:
         plt.savefig(save_path, bbox_inches="tight")
     plt.show()
