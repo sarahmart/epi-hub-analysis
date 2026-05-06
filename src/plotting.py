@@ -23,75 +23,127 @@ from matplotlib.patches import Patch
 from src.colouring import GOOGLE_PINK, HUB_BLACK, build_legend_entries
 
 # Coverage heatmap
-# TODO: sort models somehow? alphabetically or by coverage?
 
 def plot_coverage_heatmap(
     loc_cov: pd.DataFrame,
-    model_order: list[str],
+    model_order: list[str] | None,
     all_dates_hm: list,
     all_horizons: list[int],
     n_locs: int,
     hub_label: str = "",
     model_labels: dict | None = None,
+    min_panel_width: float = 8.0,
+    inches_per_model: float = 0.35,
+    inches_per_date: float = 0.28,
     save_path: str | None = None,
 ) -> None:
     """
     Heatmap of submission coverage: proportion of locations submitted per
     (model, reference week, horizon).
 
-    Parameters
-    ----------
-    loc_cov      : DataFrame with columns model_id, reference_date, horizon,
-                   prop_locs (already computed as nunique_locs / n_locs).
-    model_order  : Model IDs in desired row order (top = most covered).
-    all_dates_hm : Sorted list of reference_date Timestamps to show on x-axis.
-    all_horizons : Sorted list of horizon ints for panel titles.
-    n_locs       : Total number of locations (used only for labelling).
-    hub_label    : Short string for the figure suptitle, e.g. "COVID".
+    Models sorted alphabetically by display label unless model_order
+    supplied explicitly.
     """
+
+    def _label(model_id: str) -> str:
+        return model_labels.get(model_id, model_id) if model_labels else model_id
+
+    # Sort models alphabetically by displayed label unless order supplied
+    if model_order is None:
+        model_order = sorted(loc_cov["model_id"].dropna().unique(), key=_label)
+    else:
+        model_order = sorted(model_order, key=_label)
+
     date_labels = [d.strftime("%b %d") for d in all_dates_hm]
+
     cmap = plt.get_cmap("Blues").copy()
     cmap.set_bad("whitesmoke")
 
-    ncols = 2
+    n_models = len(model_order)
+    n_dates = len(all_dates_hm)
+
+    ncols = 2 if len(all_horizons) > 1 else 1
     nrows = int(np.ceil(len(all_horizons) / ncols))
-    fig, axes = plt.subplots(nrows, ncols, figsize=(16, 7 * nrows), constrained_layout=True)
+
+    panel_width = max(min_panel_width, n_dates * inches_per_date)
+    panel_height = max(4.5, n_models * inches_per_model)
+
+    fig, axes = plt.subplots(
+        nrows,
+        ncols,
+        figsize=(panel_width * ncols + 0.8, panel_height * nrows),
+        constrained_layout=False,
+    )
     axes = np.atleast_1d(axes).ravel()
 
     title = "Submission coverage: proportion of locations per (model, reference week)"
     if hub_label:
         title = f"{hub_label} — {title}"
-    fig.suptitle(f"{title}\nGrey = no submission")
 
     im = None
+
     for i, h in enumerate(all_horizons):
         ax = axes[i]
+
         sub = loc_cov[loc_cov["horizon"] == h]
+
         pivot = (
             sub.pivot(index="model_id", columns="reference_date", values="prop_locs")
             .reindex(index=model_order, columns=all_dates_hm)
         )
+
         im = ax.imshow(
-            pivot.values, aspect="auto", vmin=0, vmax=1,
-            cmap=cmap, interpolation="nearest",
+            pivot.values,
+            aspect="auto",
+            vmin=0,
+            vmax=1,
+            cmap=cmap,
+            interpolation="nearest",
         )
-        ax.set_title(f"Horizon {h:.0f}")
-        ax.set_xticks(range(len(all_dates_hm)))
-        ax.set_xticklabels(date_labels, rotation=90)
-        ax.set_yticks(range(len(model_order)))
-        ax.set_yticklabels(
-            [model_labels.get(m, m) if model_labels else m for m in model_order],
+
+        ax.set_title(f"Horizon {h:.0f}", pad=10)
+
+        ax.set_xticks(range(n_dates))
+        ax.set_xticklabels(
+            date_labels,
+            rotation=90,
         )
+
+        is_left_col = i % ncols == 0
+        ax.set_yticks(range(n_models))
+        if is_left_col:
+            ax.set_yticklabels([_label(m) for m in model_order])
+        else:
+            ax.set_yticklabels([])
+            ax.tick_params(axis="y", length=0)
+
+        ax.tick_params(axis="x", pad=4)
+        ax.tick_params(axis="y", pad=4)
         ax.grid(False)
 
     for j in range(len(all_horizons), len(axes)):
         axes[j].set_visible(False)
 
     if im is not None:
-        fig.colorbar(im, ax=axes[:len(all_horizons)], shrink=0.5,
-                     label="Proportion of locations submitted")
+        cbar_ax = fig.add_axes([0.94, 0.18, 0.015, 0.68])
+        cbar = fig.colorbar(im, cax=cbar_ax)
+        cbar.set_label("Proportion of locations submitted")
+
+    fig.subplots_adjust(
+        left=0.18 if n_models > 12 else 0.12,
+        right=0.91,
+        top=0.88,
+        bottom=0.20,
+        wspace=0.42,
+        hspace=0.35,
+    )
+
     if save_path:
+        folder = os.path.dirname(save_path)
+        if folder:
+            os.makedirs(folder, exist_ok=True)
         plt.savefig(save_path, bbox_inches="tight")
+
     plt.show()
 
 
