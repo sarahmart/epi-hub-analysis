@@ -108,6 +108,7 @@ def plot_season_bars(
     inches_per_bar: float = 0.3,
     min_fig_width: float = 6.0,
     save_path: str | None = None,
+    legend_buffer: float = -0.7
 ) -> None:
     
     n = len(summary)
@@ -183,7 +184,7 @@ def plot_season_bars(
             handles=handles,
             loc="lower center",
             ncol=min(len(handles), 4 if small_plot else 6),
-            bbox_to_anchor=(0.5, -0.32 if small_plot else -0.7), # works for covid and rsv, flu needs even more space
+            bbox_to_anchor=(0.5, legend_buffer),
         )
 
     # More bottom room for rotated tick labels and legend
@@ -331,6 +332,7 @@ def plot_by_horizon(
                 linewidth=2,
                 color=main_colour if is_main else model_colours.get(m, submitted_colour),
                 zorder=10 if is_main else 3,
+                alpha=1.0 if is_main else 0.7,
             )
 
         for m in hub_present:
@@ -343,6 +345,7 @@ def plot_by_horizon(
                     color=main_colour if is_main else model_colours.get(m, hub_colour),
                     linestyle="--",
                     zorder=10 if is_main else 3,
+                    alpha=1.0 if is_main else 0.7,
                 )
 
         legend_handles = [
@@ -447,7 +450,7 @@ def plot_weekly_scores(
         ax.set_ylabel(ylabel)
         ax.set_title(title)
 
-    axes[1].tick_params(axis="x", rotation=0)
+    axes[1].tick_params(axis="x", rotation=45)
 
     legend_handles = [
         Line2D(
@@ -473,7 +476,6 @@ def plot_weekly_scores(
                 label=main_model,
             )
         )
-
     legend_handles.append(
         Line2D(
             [0], [0],
@@ -492,7 +494,7 @@ def plot_weekly_scores(
         ncol=len(legend_handles),
         bbox_to_anchor=(0.5, -0.08),
     )
-    plt.suptitle(f"{prefix}Weekly Mean Performance over Reference Dates")
+    # plt.suptitle(f"{prefix}Weekly Mean Performance over Reference Dates")
     if save_path:
         plt.savefig(save_path, bbox_inches="tight")
     plt.show()
@@ -1110,10 +1112,10 @@ def plot_by_location(
             handles=legend_handles,
             loc="lower center",
             ncol=min(len(legend_handles), 5),
-            bbox_to_anchor=(0.5, -0.04),
+            bbox_to_anchor=(0.5, -0.05),
         )
 
-    fig.suptitle(f"{prefix}Model performance by jurisdiction")
+    # fig.suptitle(f"{prefix}Model performance by jurisdiction")
     if save_path:
         folder = os.path.dirname(save_path)
         if folder:
@@ -1134,7 +1136,7 @@ def plot_rank_distribution(
     hub_label: str = "",
     show_n_tasks: bool = True,
     kde_max_height: float = 1,
-    inches_per_row: float = 0.55,
+    inches_per_row: float = 1.0,
     save_path: str | None = None,
 ) -> None:
     """
@@ -1199,7 +1201,7 @@ def plot_rank_distribution(
 
     # Draw ridgelines
     fig_height = max(3.5, n_models * inches_per_row + 1.6)
-    fig, ax = plt.subplots(figsize=(10, fig_height), constrained_layout=True)
+    fig, ax = plt.subplots(figsize=(15, fig_height), constrained_layout=True)
     right_trans = mtransforms.blended_transform_factory(ax.transAxes, ax.transData)
 
     for i, model in enumerate(model_order):
@@ -1290,15 +1292,15 @@ def plot_rank_distribution(
     _ax_h = max(2.0, n_models * inches_per_row)
     ax.legend(
         handles=legend_handles, title="Rank Quartile",
-        loc="upper center", bbox_to_anchor=(0.5, -0.45 / _ax_h),
+        loc="upper center", bbox_to_anchor=(0.4, -0.55 / _ax_h),
         ncol=4, frameon=True,
     )
 
     metric_label = "log WIS" if score_col == "log_wis" else "WIS"
     prefix = f"{hub_label}: " if hub_label else ""
-    ax.set_title(
-        f"{prefix}Distribution of standardized {metric_label} ranks."
-    )
+    # ax.set_title(
+    #     f"{prefix}Distribution of standardized {metric_label} ranks."
+    # )
 
     if save_path:
         plt.savefig(save_path, bbox_inches="tight")
