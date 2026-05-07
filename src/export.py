@@ -18,6 +18,7 @@ LaTeX preamble requirements (only needed when exporting):
 
 from __future__ import annotations
 
+import re
 import pathlib
 from IPython.display import display
 
@@ -62,16 +63,14 @@ def show_table(
     TABLES_DIR.mkdir(exist_ok=True)
 
     stem = f"{prefix}_{name}" if prefix else name
-    if not label:
-        label = f"tab:{stem}"
 
     latex = styler.to_latex(
-        caption=caption or None,
-        label=label,
         convert_css=True,
         hrules=True,
-        position_float="centering",
     )
+
+    latex = re.sub(r'(?<!\\)_', r'\\_', latex)
+    latex = re.sub(r'(?<!\\)%', r'\\%', latex)
 
     out_path = TABLES_DIR / f"{stem}.tex"
     out_path.write_text(latex, encoding="utf-8")
