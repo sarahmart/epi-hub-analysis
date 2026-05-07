@@ -563,7 +563,7 @@ def plot_forecast_fans(
     location_names: dict | None = None,
     locations: list[str] | None = None,
     exclude_locations: set[str] | None = None,
-    ncols: int = 4,
+    ncols: int = 6,
     inner_ci: tuple[float, float] = (0.25, 0.75),
     outer_ci: tuple[float, float] = (0.025, 0.975),
     subplot_height: float = 2.2,
