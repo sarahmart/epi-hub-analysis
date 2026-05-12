@@ -9,12 +9,13 @@ To run analysis for any of the COVID (`covid`), FluSight (`flu`) or RSV (`rsv`) 
 3. Open `<hub>_analysis.ipynb` and run all to generate all plots and analyses. 
 
 Note: coloured tables do not show in GitHub previews of notebooks, but should be visible if the notebooks are run locally.
+These are also exported to `tex` files on notebook runs.
 
 ## Google Internal Hub
 
 To run analysis for the Google Research internal hub (`google_covid`, `google_flu`, `google_rsv`):
 
-1. Make sure the corresponding CDC hub data is already loaded (the internal hubs reuse CDC ground truth data):
+1. Make sure the corresponding CDC hub data is already loaded (the internal hubs reuse CDC ground truth data) [this step is already complete if you follow the steps above]:
     * `python -m src.load_hub --hub <hub> --incremental`
 2. Load Google internal forecasts for each disease:
     * `python -m src.load_hub --hub google_<hub> --incremental`

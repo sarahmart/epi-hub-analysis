@@ -5,6 +5,10 @@ from pathlib import Path
 
 import pandas as pd
 
+# Update season_end here for different analysis windows.
+# Season start specified in each HubConfig as the first valid Google-SAI submissions to different hubs. 
+SEASON_END = pd.Timestamp("2026-05-12") # pd.Timestamp("2026-05-31")
+
 
 @dataclass(frozen=True)
 class HubConfig:
@@ -60,7 +64,6 @@ class HubConfig:
 
 
 # Hub instances
-# Update season_start / season_end here for current analysis window. 
 
 COVID_HUB = HubConfig(
     name="covid",
@@ -69,7 +72,7 @@ COVID_HUB = HubConfig(
     branch="main",
     target_name="wk inc covid hosp",
     season_start=pd.Timestamp("2025-12-10"),
-    season_end=pd.Timestamp("2026-05-31"),
+    season_end=SEASON_END,
     ensemble_id="CovidHub-ensemble",
     baseline_id="CovidHub-baseline",
     google_id="Google_SAI-Ensemble",
@@ -82,7 +85,7 @@ RSV_HUB = HubConfig(
     branch="main",
     target_name="wk inc rsv hosp",
     season_start=pd.Timestamp("2026-01-01"),
-    season_end=pd.Timestamp("2026-05-31"),
+    season_end=SEASON_END,
     ensemble_id="RSVHub-ensemble",
     baseline_id="RSVHub-baseline",
     google_id="Google_SAI-RSVEns",
@@ -95,7 +98,7 @@ FLU_HUB = HubConfig(
     branch="main",
     target_name="wk inc flu hosp",
     season_start=pd.Timestamp("2025-11-22"),
-    season_end=pd.Timestamp("2026-05-31"),
+    season_end=SEASON_END,
     ensemble_id="FluSight-ensemble",
     baseline_id="FluSight-baseline", # there are also multiple baselines, currently not yet implemented
     google_id="Google_SAI-FluEns",
