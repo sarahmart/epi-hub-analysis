@@ -1015,7 +1015,6 @@ def plot_crosshub_rel_bars(
 # Per-jurisdiction performance plot
 
 def plot_by_location(
-    by_loc_wis: pd.DataFrame,
     by_loc_log: pd.DataFrame,
     model_colours: dict,
     hub_models: set | None = None,
@@ -1028,14 +1027,14 @@ def plot_by_location(
     save_path: str | None = None,
 ) -> None:
     """
-    Model performance per jurisdiction.
+    Model performance per jurisdiction (mean log WIS).
     One row per location, one dot per model. Locations sorted alphabetically
     (A at top).
 
     Parameters
     ----------
-    by_loc_wis, by_loc_log
-        DataFrames indexed by model_id, columns = location names or codes.
+    by_loc_log
+        DataFrame indexed by model_id, columns = location names or codes.
         Pre-filter to eligible + hub models before passing.
     model_colours     : dict mapping model_id → colour.
     hub_models        : Set of hub model IDs (always included, distinct style).
@@ -1067,69 +1066,60 @@ def plot_by_location(
     y_map = {loc: i for i, loc in enumerate(sorted_locs)}
 
     fig_height = max(5.0, n_locs * inches_per_row + 1.8)
-    prefix = f"{hub_label}: " if hub_label else ""
 
-    fig, axes = plt.subplots(
-        1, 2, figsize=(13, fig_height),
-        constrained_layout=True, sharey=True,
-    )
+    _, ax = plt.subplots(figsize=(7, fig_height), constrained_layout=True)
 
-    for ax, data, xlabel, panel_title in [
-        (axes[1], by_loc_wis, "Mean WIS",     "Mean WIS by jurisdiction"),
-        (axes[0], by_loc_log, "Mean log WIS", "Mean log WIS by jurisdiction"),
-    ]:
-        avail = [loc for loc in sorted_locs if loc in data.columns]
-        sub = data.loc[[m for m in plot_models if m in data.index], avail]
+    avail = [loc for loc in sorted_locs if loc in by_loc_log.columns]
+    sub = by_loc_log.loc[[m for m in plot_models if m in by_loc_log.index], avail]
 
-        # Grey range lines (min → max across all models per location)
-        for loc in avail:
-            vals = sub[loc].dropna()
-            if len(vals) >= 2:
-                ax.hlines(
-                    y_map[loc], vals.min(), vals.max(),
-                    color="0.82", linewidth=0.7, zorder=1,
-                )
-
-        # Dots drawn back-to-front: other eligible → hub → main_model
-        draw_order = (
-            [m for m in top_eligible if m != main_model and m in sub.index]
-            + [m for m in hub_in if m != main_model and m in sub.index]
-            + ([main_model] if main_model and main_model in sub.index else [])
-        )
-
-        for m in draw_order:
-            is_main = (m == main_model)
-            is_hub  = (m in hub_set)
-            color   = _main_colour if is_main else model_colours.get(m, "0.5")
-            marker  = "D" if is_main else ("s" if is_hub else "o")
-            size    = 55  if is_main else (30  if is_hub else 25)
-            zorder  = 5   if is_main else (4   if is_hub else 2)
-            alpha   = 1.0 if (is_main or is_hub) else 0.65
-
-            valid = [
-                (y_map[loc], sub.loc[m, loc])
-                for loc in avail
-                if not pd.isna(sub.loc[m, loc])
-            ]
-            if not valid:
-                continue
-            ys, xs = zip(*valid)
-            ax.scatter(
-                xs, ys, color=color, s=size, zorder=zorder,
-                alpha=alpha, marker=marker,
-                edgecolors="white" if is_main else "none",
-                linewidths=0.5,
+    # Grey range lines (min → max across all models per location)
+    for loc in avail:
+        vals = sub[loc].dropna()
+        if len(vals) >= 2:
+            ax.hlines(
+                y_map[loc], vals.min(), vals.max(),
+                color="0.82", linewidth=0.7, zorder=1,
             )
 
-        ax.set_xlabel(xlabel)
-        ax.set_title(panel_title, pad=5)
-        ax.grid(True, axis="x", alpha=0.3)
-        ax.grid(False, axis="y")
-        ax.tick_params(axis="y", length=0)
+    # Dots drawn back-to-front: other eligible → hub → main_model
+    draw_order = (
+        [m for m in top_eligible if m != main_model and m in sub.index]
+        + [m for m in hub_in if m != main_model and m in sub.index]
+        + ([main_model] if main_model and main_model in sub.index else [])
+    )
 
-    axes[0].set_yticks(range(n_locs))
-    axes[0].set_yticklabels(sorted_locs)
-    axes[0].set_ylim(-0.7, n_locs - 0.3)
+    for m in draw_order:
+        is_main = (m == main_model)
+        is_hub  = (m in hub_set)
+        color   = _main_colour if is_main else model_colours.get(m, "0.5")
+        marker  = "D" if is_main else ("s" if is_hub else "o")
+        size    = 55  if is_main else (30  if is_hub else 25)
+        zorder  = 5   if is_main else (4   if is_hub else 2)
+        alpha   = 1.0 if (is_main or is_hub) else 0.65
+
+        valid = [
+            (y_map[loc], sub.loc[m, loc])
+            for loc in avail
+            if not pd.isna(sub.loc[m, loc])
+        ]
+        if not valid:
+            continue
+        ys, xs = zip(*valid)
+        ax.scatter(
+            xs, ys, color=color, s=size, zorder=zorder,
+            alpha=alpha, marker=marker,
+            edgecolors="white" if is_main else "none",
+            linewidths=0.5,
+        )
+
+    ax.set_xlabel("Mean log WIS")
+    ax.set_title("Mean log WIS by jurisdiction", pad=5)
+    ax.grid(True, axis="x", alpha=0.3)
+    ax.grid(False, axis="y")
+    ax.tick_params(axis="y", length=0)
+    ax.set_yticks(range(n_locs))
+    ax.set_yticklabels(sorted_locs)
+    ax.set_ylim(-0.7, n_locs - 0.3)
 
     # Legend
     legend_handles = []
@@ -1160,14 +1150,13 @@ def plot_by_location(
         ))
 
     if legend_handles:
-        fig.legend(
+        ax.legend(
             handles=legend_handles,
-            loc="lower center",
-            ncol=min(len(legend_handles), 5),
-            bbox_to_anchor=(0.5, -0.05),
+            loc="upper left",
+            bbox_to_anchor=(1.01, 1),
+            borderaxespad=0,
         )
 
-    # fig.suptitle(f"{prefix}Model performance by jurisdiction")
     if save_path:
         folder = os.path.dirname(save_path)
         if folder:
