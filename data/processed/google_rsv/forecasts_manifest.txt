@@ -17,6 +17,9 @@ epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_1/2026-04-18-Google_SAI-Nove
 epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_1/2026-04-25-Google_SAI-Novel_1.csv
 epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_1/2026-05-02-Google_SAI-Novel_1.csv
 epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_1/2026-05-09-Google_SAI-Novel_1.csv
+epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_1/2026-05-16-Google_SAI-Novel_1.csv
+epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_1/2026-05-23-Google_SAI-Novel_1.csv
+epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_1/2026-05-30-Google_SAI-Novel_1.csv
 epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_2/2026-01-03-Google_SAI-Novel_2.csv
 epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_2/2026-01-10-Google_SAI-Novel_2.csv
 epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_2/2026-01-17-Google_SAI-Novel_2.csv
@@ -36,3 +39,6 @@ epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_2/2026-04-18-Google_SAI-Nove
 epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_2/2026-04-25-Google_SAI-Novel_2.csv
 epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_2/2026-05-02-Google_SAI-Novel_2.csv
 epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_2/2026-05-09-Google_SAI-Novel_2.csv
+epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_2/2026-05-16-Google_SAI-Novel_2.csv
+epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_2/2026-05-23-Google_SAI-Novel_2.csv
+epi_forecasts/rsv_hub/model_output/Google_SAI-Novel_2/2026-05-30-Google_SAI-Novel_2.csv

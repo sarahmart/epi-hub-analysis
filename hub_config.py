@@ -7,7 +7,7 @@ import pandas as pd
 
 # Update season_end here for different analysis windows.
 # Season start specified in each HubConfig as the first valid Google-SAI submissions to different hubs. 
-SEASON_END = pd.Timestamp("2026-05-12") # pd.Timestamp("2026-05-31")
+SEASON_END = pd.Timestamp("2026-05-30") # season end for flu/RSV (last submission 2026-05-30); truth reaches 2026-07-04
 
 
 @dataclass(frozen=True)
