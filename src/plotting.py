@@ -1346,3 +1346,166 @@ def plot_rank_distribution(
     if save_path:
         plt.savefig(save_path, bbox_inches="tight")
     plt.show()
+
+
+# WIS decomposition (dispersion / over- / under-prediction)
+
+def plot_wis_decomposition(
+    scores: pd.DataFrame,
+    eligible_models: list[str],
+    model_colours: dict,
+    top_n: int = 15,
+    main_model: str | None = None,
+    hub_label: str = "",
+    show_n_tasks: bool = True,
+    model_labels: dict | None = None,
+    inches_per_row: float = 0.42,
+    save_path: str | None = None,
+) -> None:
+    """
+    Stacked-bar decomposition of mean WIS into dispersion, overprediction and
+    underprediction (Bracher et al. 2021), inspired by the scoringutils
+    decomposition figure (Bosse et al. 2024).
+
+    Panel A shows absolute mean contributions (the three bars sum to the mean
+    WIS); panel B shows the same normalised to 1 (the calibration mix,
+    independent of overall magnitude). Models are ordered by mean WIS with the
+    best (lowest) at the top, matching ``plot_rank_distribution``.
+
+    "Overprediction" penalises forecasts that sit too high (truth below the
+    interval); "underprediction" too low; "dispersion" rewards sharpness.
+
+    Requires the component columns ``wis_dispersion`` / ``wis_overprediction`` /
+    ``wis_underprediction`` produced by ``src.scoring``.
+
+    Parameters
+    ----------
+    scores          : Scores DataFrame with wis_dispersion, wis_overprediction,
+                      wis_underprediction, wis and model_id columns.
+    eligible_models : Model IDs to include.
+    model_colours   : dict model_id → colour; used to highlight ``main_model``.
+    top_n           : Maximum number of models to display (best mean WIS).
+    main_model      : Model ID to highlight with a bold, coloured y-label.
+    hub_label       : Short hub name for the figure title.
+    show_n_tasks    : If True, annotate each row with the model's task count.
+    model_labels    : Optional dict model_id → display label.
+    inches_per_row  : Figure height allocated per model row.
+    """
+    # Component palette (colour, legend label) and left-to-right stacking order.
+    # Deliberately distinct from the model-provenance colours (hub red / Google
+    # blue) so components aren't confused with model identity. Kept local so the
+    # function is self-contained (survives notebook autoreload without a restart).
+    component_style = {
+        "dispersion":      ("#9aa0a6", "dispersion (spread)"),
+        "overprediction":  ("#c0603d", "overprediction (forecast too high)"),
+        "underprediction": ("#5b8c5a", "underprediction (forecast too low)"),
+    }
+    component_order = ["dispersion", "overprediction", "underprediction"]
+
+    comp_cols = ["wis_dispersion", "wis_overprediction", "wis_underprediction"]
+    missing = [c for c in comp_cols if c not in scores.columns]
+    if missing:
+        raise ValueError(
+            f"plot_wis_decomposition requires columns {missing}; re-run "
+            "src.scoring to regenerate scores with the WIS components."
+        )
+
+    def _label(m: str) -> str:
+        return model_labels.get(m, m) if model_labels else m
+
+    elig = scores[scores["model_id"].isin(eligible_models)]
+    elig = elig[elig[comp_cols].notna().all(axis=1)]
+    if elig.empty:
+        return
+
+    agg = elig.groupby("model_id").agg(
+        dispersion=("wis_dispersion", "mean"),
+        overprediction=("wis_overprediction", "mean"),
+        underprediction=("wis_underprediction", "mean"),
+        n_tasks=("wis", "size"),
+    )
+    agg["total"] = agg[["dispersion", "overprediction", "underprediction"]].sum(axis=1)
+    agg = agg.sort_values("total", ascending=True).iloc[:top_n]  # best first
+
+    model_order = agg.index.tolist()          # [best, …, worst]
+    n_models = len(model_order)
+    if n_models == 0:
+        return
+
+    y_pos = np.arange(n_models)[::-1]         # model_order[0] (best) → top
+    _main_color = (
+        model_colours.get(main_model, GOOGLE_PINK) if main_model else GOOGLE_PINK
+    )
+
+    fig_height = max(3.0, n_models * inches_per_row + 1.8)
+    fig, (axA, axB) = plt.subplots(
+        1, 2, figsize=(14, fig_height), sharey=True
+    )
+
+    comps = [(k, component_style[k][0]) for k in component_order]
+
+    for ax, normalise, title in [
+        (axA, False, "A: absolute contributions"),
+        (axB, True, "B: normalised to 1"),
+    ]:
+        left = np.zeros(n_models)
+        denom = agg["total"].to_numpy() if normalise else np.ones(n_models)
+        denom = np.where(denom == 0, np.nan, denom)
+        for name, color in comps:
+            vals = agg[name].to_numpy() / denom
+            ax.barh(
+                y_pos, vals, left=left, color=color,
+                edgecolor="white", linewidth=0.5, height=0.75, zorder=2,
+            )
+            left += np.nan_to_num(vals)
+        ax.set_title(title, fontsize=11)
+        ax.xaxis.grid(True, alpha=0.3)
+        ax.set_axisbelow(True)
+
+    axA.set_xlabel("mean WIS contribution")
+    axB.set_xlabel("share of mean WIS")
+    axB.set_xlim(0, 1)
+
+    axA.set_yticks(y_pos)
+    axA.set_yticklabels([_label(m) for m in model_order])
+    for tick, m in zip(axA.get_yticklabels(), model_order):
+        if m == main_model:
+            tick.set_color(_main_color)
+            tick.set_fontweight("bold")
+
+    if show_n_tasks:
+        trans = mtransforms.blended_transform_factory(axB.transAxes, axB.transData)
+        for yp, m in zip(y_pos, model_order):
+            axB.text(
+                1.01, yp, f"n={int(agg.loc[m, 'n_tasks']):,}",
+                transform=trans, va="center", ha="left", color="0.4",
+            )
+
+    legend_handles = [
+        Patch(facecolor=component_style[k][0], label=component_style[k][1])
+        for k in component_order
+    ]
+    # Reserve strips at top (suptitle) and bottom (legend) so neither collides
+    # with the axes, regardless of how many model rows are drawn.
+    # The bottom strip must hold the x-labels AND the legend below them; that
+    # needs a roughly fixed ~1.5 inches, so the fraction grows for short figures.
+    fig.subplots_adjust(
+        top=1.0 - 0.45 / fig_height,
+        bottom=min(0.30, 1.5 / fig_height),
+        wspace=0.06,
+        left=0.16,
+        right=0.94,
+    )
+    fig.legend(
+        handles=legend_handles, title="WIS component",
+        loc="lower center", ncol=3, frameon=True,
+        bbox_to_anchor=(0.5, 0.005),
+    )
+
+    # Title omitted to match plot_rank_distribution — figure is captioned in LaTeX.
+    # prefix = f"{hub_label}: " if hub_label else ""
+    # fig.suptitle(f"{prefix}WIS decomposition", fontsize=12)
+
+    if save_path:
+        plt.savefig(save_path, bbox_inches="tight")
+    plt.show()

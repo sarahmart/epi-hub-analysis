@@ -20,15 +20,24 @@ import pandas as pd
 from hub_config import HUBS, HubConfig
 
 
-def _wis(y: float, taus: np.ndarray, qvals: np.ndarray) -> float:
+def _wis_components(
+    y: float, taus: np.ndarray, qvals: np.ndarray
+) -> tuple[float, float, float]:
     """
-    Weighted Interval Score (Bracher et al. 2021).
+    Decompose the Weighted Interval Score into its three additive parts
+    (Bracher et al. 2021), returned as ``(dispersion, overprediction,
+    underprediction)``.  By construction their sum equals ``_wis``.
 
         WIS = 1/(K + 0.5) * [ 0.5*|y - m|  +  sum_k (alpha_k/2) * IS_{alpha_k} ]
 
-    where IS_alpha(l, u, y) = (u - l)
-                              + (2/alpha) * (l - y) * 1(y < l)
-                              + (2/alpha) * (y - u) * 1(y > u)
+    where IS_alpha(l, u, y) = (u - l)                         [dispersion]
+                              + (2/alpha) * (l - y) * 1(y < l) [overprediction]
+                              + (2/alpha) * (y - u) * 1(y > u) [underprediction]
+
+    "Overprediction" = truth falls below the interval (forecast too high);
+    "underprediction" = truth falls above it (forecast too low).  The
+    0.5*|y - m| median penalty is assigned to overprediction when the median
+    exceeds y and to underprediction otherwise, following ``scoringutils``.
 
     K and the interval set are derived from the quantiles actually present in
     the submission: for each lower_tau < 0.5, look for its symmetric partner
@@ -39,16 +48,29 @@ def _wis(y: float, taus: np.ndarray, qvals: np.ndarray) -> float:
     y     : observed value
     taus  : 1-D array of quantile levels (sorted ascending)
     qvals : corresponding quantile values
+
+    Returns
+    -------
+    (dispersion, overprediction, underprediction), or (nan, nan, nan) if the
+    median quantile is absent.
     """
     tau_to_q = dict(zip(taus.tolist(), qvals.tolist()))
 
     median = tau_to_q.get(0.5, np.nan)
     if np.isnan(median):
-        return np.nan
+        return (np.nan, np.nan, np.nan)
 
-    total = 0.5 * abs(y - median)
+    dispersion = 0.0
+    over = 0.0
+    under = 0.0
+
+    # Median penalty (0.5*|y - m|) split by direction.
+    if median > y:
+        over += 0.5 * (median - y)
+    else:
+        under += 0.5 * (y - median)
+
     k = 0
-
     for lower_tau, q_lower in sorted(tau_to_q.items()):
         if lower_tau >= 0.5:
             break
@@ -57,15 +79,28 @@ def _wis(y: float, taus: np.ndarray, qvals: np.ndarray) -> float:
         if q_upper is None:
             continue
         alpha = 2.0 * lower_tau
-        interval_score = (
-            (q_upper - q_lower)
-            + (2.0 / alpha) * (q_lower - y) * (y < q_lower)
-            + (2.0 / alpha) * (y - q_upper) * (y > q_upper)
-        )
-        total += (alpha / 2.0) * interval_score
+        dispersion += (alpha / 2.0) * (q_upper - q_lower)
+        if y < q_lower:
+            over += q_lower - y
+        elif y > q_upper:
+            under += y - q_upper
         k += 1
 
-    return total / (k + 0.5)
+    denom = k + 0.5
+    return (dispersion / denom, over / denom, under / denom)
+
+
+def _wis(y: float, taus: np.ndarray, qvals: np.ndarray) -> float:
+    """
+    Weighted Interval Score (Bracher et al. 2021).
+
+    Equals the sum of the three components returned by ``_wis_components``.
+    See that function for the full definition.
+    """
+    dispersion, over, under = _wis_components(y, taus, qvals)
+    if np.isnan(dispersion):
+        return np.nan
+    return dispersion + over + under
 
 
 def score_one_forecast(group: pd.DataFrame) -> pd.Series:
@@ -82,8 +117,15 @@ def score_one_forecast(group: pd.DataFrame) -> pd.Series:
 
     tau_to_q = dict(zip(taus.tolist(), qvals.tolist()))
 
-    # ---- WIS ----
-    wis = _wis(y, taus, qvals)
+    # ---- WIS (with additive dispersion / over- / under-prediction split) ----
+    wis_dispersion, wis_overprediction, wis_underprediction = _wis_components(
+        y, taus, qvals
+    )
+    wis = (
+        wis_dispersion + wis_overprediction + wis_underprediction
+        if not np.isnan(wis_dispersion)
+        else np.nan
+    )
 
     # ---- log WIS ----
     log_wis = _wis(log_y, taus, log_qvals)
@@ -108,6 +150,9 @@ def score_one_forecast(group: pd.DataFrame) -> pd.Series:
             "median": median,
             "ae_median": ae_median,
             "wis": wis,
+            "wis_dispersion": wis_dispersion,
+            "wis_overprediction": wis_overprediction,
+            "wis_underprediction": wis_underprediction,
             "log_wis": log_wis,
             "cov_50": cov_50,
             "cov_95": cov_95,

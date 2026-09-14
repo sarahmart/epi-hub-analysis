@@ -1,4 +1,6 @@
 .claude
 __pycache__
 figures/pink
+figures/arxiv_version
 tables/
+.DS_Store
