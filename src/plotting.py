@@ -22,6 +22,10 @@ from matplotlib.patches import Patch
 
 from src.colouring import GOOGLE_PINK, HUB_BLACK, build_legend_entries
 
+# Shared style: subplot/panel heading size (ax.set_title inherits this unless a
+# call passes an explicit fontsize).
+plt.rcParams["axes.titlesize"] = 14
+
 # Coverage heatmap
 
 def plot_coverage_heatmap(
@@ -1393,12 +1397,16 @@ def plot_wis_decomposition(
     """
     # Component palette (colour, legend label) and left-to-right stacking order.
     # Deliberately distinct from the model-provenance colours (hub red / Google
-    # blue) so components aren't confused with model identity. Kept local so the
-    # function is self-contained (survives notebook autoreload without a restart).
+    # blue) so components aren't confused with model identity. Over/under use a
+    # warm-vs-cool pair (tan = "too high", teal = "too low") that reads as a
+    # direction rather than a value judgement — avoiding green (implies "good")
+    # and the vivid orange/red/blue/purple already used elsewhere in the palette.
+    # Kept local so the function is self-contained (survives notebook autoreload
+    # without a restart).
     component_style = {
         "dispersion":      ("#9aa0a6", "dispersion (spread)"),
-        "overprediction":  ("#c0603d", "overprediction (forecast too high)"),
-        "underprediction": ("#5b8c5a", "underprediction (forecast too low)"),
+        "overprediction":  ("#b5835a", "overprediction (forecast too high)"),
+        "underprediction": ("#5c8a9a", "underprediction (forecast too low)"),
     }
     component_order = ["dispersion", "overprediction", "underprediction"]
 
@@ -1445,8 +1453,8 @@ def plot_wis_decomposition(
     comps = [(k, component_style[k][0]) for k in component_order]
 
     for ax, normalise, title in [
-        (axA, False, "A: absolute contributions"),
-        (axB, True, "B: normalised to 1"),
+        (axA, False, r"$\bf{a}~~Absolute~contributions$"),
+        (axB, True, r"$\bf{b}~~Normalised~to~one$"),
     ]:
         left = np.zeros(n_models)
         denom = agg["total"].to_numpy() if normalise else np.ones(n_models)
@@ -1458,7 +1466,7 @@ def plot_wis_decomposition(
                 edgecolor="white", linewidth=0.5, height=0.75, zorder=2,
             )
             left += np.nan_to_num(vals)
-        ax.set_title(title, fontsize=11)
+        ax.set_title(title)  # size from plt.rcParams["axes.titlesize"]
         ax.xaxis.grid(True, alpha=0.3)
         ax.set_axisbelow(True)
 
@@ -1488,21 +1496,21 @@ def plot_wis_decomposition(
     # Reserve strips at top (suptitle) and bottom (legend) so neither collides
     # with the axes, regardless of how many model rows are drawn.
     # The bottom strip must hold the x-labels AND the legend below them; that
-    # needs a roughly fixed ~1.5 inches, so the fraction grows for short figures.
+    # needs a roughly fixed ~2.1 inches, so the fraction grows for short figures.
+    bottom_frac = min(0.34, 2.1 / fig_height)
     fig.subplots_adjust(
         top=1.0 - 0.45 / fig_height,
-        bottom=min(0.30, 1.5 / fig_height),
+        bottom=bottom_frac,
         wspace=0.06,
         left=0.16,
         right=0.94,
     )
     fig.legend(
         handles=legend_handles, title="WIS component",
-        loc="lower center", ncol=3, frameon=True,
-        bbox_to_anchor=(0.5, 0.005),
+        loc="upper center", ncol=3, frameon=True,
+        bbox_to_anchor=(0.5, bottom_frac - 0.6 / fig_height),
     )
 
-    # Title omitted to match plot_rank_distribution — figure is captioned in LaTeX.
     # prefix = f"{hub_label}: " if hub_label else ""
     # fig.suptitle(f"{prefix}WIS decomposition", fontsize=12)
 
