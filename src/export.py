@@ -25,6 +25,20 @@ from IPython.display import display
 TABLES_DIR = pathlib.Path(__file__).parent.parent / "tables"
 
 
+def _extract_body(latex: str) -> str:
+    """Return only the data rows of a booktabs ``tabular`` (between ``\\midrule``
+    and ``\\bottomrule``), dropping the tabular environment, column spec and
+    header. Use when the ``.tex`` is ``\\input`` into a caller-defined
+    ``longtable`` that already supplies its own preamble, header and rules."""
+    lines = latex.splitlines()
+    try:
+        start = next(i for i, l in enumerate(lines) if l.strip().startswith(r"\midrule")) + 1
+        end = next(i for i, l in enumerate(lines) if l.strip().startswith(r"\bottomrule"))
+    except StopIteration:
+        return latex
+    return "\n".join(lines[start:end]) + "\n"
+
+
 def show_table(
     styler,
     name: str,
@@ -33,6 +47,7 @@ def show_table(
     export: bool = False,
     caption: str = "",
     label: str = "",
+    body_only: bool = False,
 ) -> None:
     """Display a pandas Styler in the notebook and optionally export to LaTeX.
 
@@ -54,6 +69,11 @@ def show_table(
     label:
         LaTeX ``\\label{}`` key (optional).  Defaults to
         ``tab:{prefix}_{name}`` when omitted.
+    body_only:
+        When ``True``, write only the data rows (no ``tabular`` environment,
+        column spec, header or rules).  Use when the ``.tex`` is ``\\input``
+        into a caller-defined ``longtable`` that supplies its own preamble and
+        header (so the table can page-break).
     """
     display(styler)
 
@@ -71,6 +91,9 @@ def show_table(
 
     latex = re.sub(r'(?<!\\)_', r'\\_', latex)
     latex = re.sub(r'(?<!\\)%', r'\\%', latex)
+
+    if body_only:
+        latex = _extract_body(latex)
 
     out_path = TABLES_DIR / f"{stem}.tex"
     out_path.write_text(latex, encoding="utf-8")

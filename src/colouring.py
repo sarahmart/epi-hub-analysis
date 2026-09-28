@@ -72,12 +72,21 @@ TYPE_HATCHES = {
     "Novel":   "x",   # cross-hatch (both diagonals)
 }
 
+# Display labels for the Google model types in table "Type" columns. Internal
+# keys stay Adapted/Hybrid/Novel (used for colour/hatch lookups and logic); these
+# are applied only when rendering.
+TYPE_DISPLAY_LABELS = {
+    "Adapted": "Scientist-inspired",
+    "Hybrid":  "Recombination",
+    "Novel":   "AI-led",
+}
+
 # Canonical (colour, hatch) → display label mapping used for auto-legend generation
 STYLE_LABELS: dict[tuple[str, str], str] = {
     (SAI_ENSEMBLE,    ""):   "Google SAI Ensemble",
-    (GOOGLE_INTERNAL, ""):   "Adapted",
-    (GOOGLE_INTERNAL, "//"): "Hybrid",
-    (GOOGLE_INTERNAL, "x"):  "Novel",
+    (GOOGLE_INTERNAL, ""):   "ERA Scientist-inspired",
+    (GOOGLE_INTERNAL, "//"): "ERA Recombination",
+    (GOOGLE_INTERNAL, "x"):  "ERA AI-led",
     (HUB,             ""):   "Hub-submitted models",
     (HUB,             "//"): "Hub ensemble",
     (HUB,             "xx"): "Hub baseline",
@@ -188,3 +197,49 @@ def make_model_hatches(
 
 def model_type_style(s):
     return [f"color: {TYPE_COLOURS.get(v, 'black')}; font-weight: bold" for v in s]
+
+
+# REPLICA JUDGMENT column (internal hub tables) — expert verdict on whether a
+# Google replica followed the model's stated methodology. Categorical, shown as
+# colour-coded bold text; NA renders blank.
+JUDGMENT_COLOURS = {
+    "Success":      "#227c49",  # green
+    "Partial fail": "#c77f00",  # amber
+    "Fail":         "#c0392b",  # red
+}
+
+# Compact glyphs for the Replica judgment column (explained in the caption).
+# pdflatex-safe LaTeX commands: \ding{51}/\ding{55} need \usepackage{pifont};
+# \LEFTcircle needs \usepackage{wasysym}. (For a notebook-native preview or
+# XeLaTeX/LuaLaTeX, swap these for the unicode "✓" / "◐" / "✗".)
+JUDGMENT_ICONS = {
+    "Success":      r"\ding{51}",
+    "Partial fail": r"\LEFTcircle",
+    "Fail":         r"\ding{55}",
+}
+
+_JUDGMENT_ALIASES = {"success": "Success", "partial fail": "Partial fail", "fail": "Fail"}
+
+
+def format_judgment(v, *, icon: bool = False) -> str:
+    """Normalise a raw 'Replica judgment' value to a display label ('' for NA).
+
+    With ``icon=True`` return the compact glyph (from ``JUDGMENT_ICONS``) instead
+    of the word."""
+    if pd.isna(v):
+        return ""
+    label = _JUDGMENT_ALIASES.get(str(v).strip().lower(), str(v))
+    return JUDGMENT_ICONS.get(label, label) if icon else label
+
+
+def replica_judgment_style(s: pd.Series) -> list[str]:
+    """Colour a Replica judgment column (words or icons) with bold, coloured text."""
+    _icon_to_label = {glyph: label for label, glyph in JUDGMENT_ICONS.items()}
+    styles = []
+    for v in s:
+        label = _icon_to_label.get(v, v)
+        styles.append(
+            f"color: {JUDGMENT_COLOURS[label]}; font-weight: bold"
+            if label in JUDGMENT_COLOURS else ""
+        )
+    return styles

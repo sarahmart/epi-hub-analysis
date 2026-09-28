@@ -1030,7 +1030,7 @@ def plot_combined_season_bars(
         fig.legend(
             handles=handles,
             loc="lower center",
-            ncol=min(len(handles), 3),
+            ncol=min(len(handles), 4),
             bbox_to_anchor=(0.5, -0.06),
         )
 
