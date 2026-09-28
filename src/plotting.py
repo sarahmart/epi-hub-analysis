@@ -151,6 +151,157 @@ def plot_coverage_heatmap(
     plt.show()
 
 
+# Shared bar-drawing helper for the season / relative bar charts
+
+def _plain_number_formatter() -> "mticker.ScalarFormatter":
+    """A ScalarFormatter that prints plain numbers (no 1e/10^n, no offset)."""
+    fmt = mticker.ScalarFormatter()
+    fmt.set_scientific(False)
+    fmt.set_useOffset(False)
+    return fmt
+
+
+# Marker shape stands in for the bar hatch when drawing lollipops (a dot can't be
+# hatched): solid → circle, // → square, x → triangle. Colour still encodes provenance.
+_HATCH_MARKER = {"": "o", "//": "s", "x": "^"}
+
+
+def _draw_metric_bars(
+    ax,
+    x,
+    values,
+    bar_colours,
+    hatch_list,
+    bar_width,
+    *,
+    center_on_baseline: bool = False,
+    log_scale: bool = False,
+    linear_pad: float = 1.2,
+    zoom: tuple | None = None,
+    style: str = "bar",
+    marker_size: float = 90,
+    line_width: float = 2.4,
+):
+    """Draw one column of metric marks with optional parity-centering / log scale.
+
+    Shared by ``plot_season_bars``, ``plot_combined_season_bars`` and
+    ``plot_crosshub_rel_bars`` so the four (centre × scale) combinations behave
+    identically everywhere.
+
+    style : "bar" (default) draws filled bars; "lollipop" draws a thin stem from
+        the baseline to a marker at the value — same geometry, layout, limits and
+        fonts, just less ink. In lollipop mode ``marker_size`` / ``line_width``
+        size the dot and stem, and the marker *shape* encodes the hatch.
+    center_on_baseline : anchor marks at the parity line (metric = 1) so models
+        that beat the baseline (< 1) point downward. Only meaningful for a ratio
+        metric where 1.0 = parity — leave False for absolute metrics (WIS).
+    log_scale : put the y-axis on a log scale. Composes with centering: marks are
+        then anchored at 1.0 via ``bottom`` (log 0 is undefined, so the linear
+        shift-to-zero trick can't be used), and tick labels stay on the real
+        metric scale.
+    linear_pad : head-room multiplier for the y-limit on a linear, non-centered
+        axis (preserves each caller's previous framing).
+    zoom : optional ``(lo, hi)`` in *metric units* (not the plotted offset). Clips
+        the value axis to this window for resolution near parity; marks whose true
+        value falls outside are annotated with their value + an arrow so the
+        clipped magnitude isn't lost.
+
+    Returns the BarContainer (or None in lollipop mode). Draws the solid parity
+    line itself when centering; callers add their own reference line (e.g. dashed
+    at 1) for the other cases.
+    """
+    values = np.asarray(values, dtype="float64")
+
+    baseline = 1.0 if center_on_baseline else 0.0
+    # On a log axis a centered mark spans [1, value] via bottom=1; on a linear
+    # axis it spans [0, value-1] so parity sits on the y=0 baseline.
+    bottom = 1.0 if (center_on_baseline and log_scale) else 0.0
+    heights = values - baseline if center_on_baseline else values
+
+    if style == "lollipop":
+        tips = bottom + heights
+        x_arr = np.asarray(x, dtype="float64")
+        ax.vlines(x_arr, bottom, tips, color=bar_colours,
+                  linewidth=line_width, alpha=0.85, zorder=1)
+        markers = [_HATCH_MARKER.get(h, "o") for h in hatch_list]
+        for mk in set(markers):
+            idx = [j for j, mm in enumerate(markers) if mm == mk]
+            ax.scatter(
+                x_arr[idx], tips[idx],
+                c=[bar_colours[j] for j in idx], marker=mk, s=marker_size,
+                edgecolor="white", linewidth=0.6, zorder=3,
+            )
+        bars = None
+    else:
+        bars = ax.bar(
+            x, heights, bottom=bottom,
+            color=bar_colours, width=bar_width, align="center",
+            edgecolor="white", linewidth=0.5,
+        )
+        for bar, h in zip(bars, hatch_list):
+            if h:
+                bar.set_hatch(h)
+
+    finite = values[np.isfinite(values)]
+    vmax = float(finite.max()) if finite.size else 1.0
+    vmin = float(finite.min()) if finite.size else 1.0
+
+    if log_scale:
+        ax.set_yscale("log")
+        lo, hi = vmin, vmax
+        if center_on_baseline:
+            lo, hi = min(lo, 1.0), max(hi, 1.0)
+        ax.set_ylim(lo / 1.15, hi * 1.15)
+        # Plain-number labels instead of 10^n. For sub-decade ranges (typical of
+        # relative WIS) also label the minor ticks so the axis isn't near-empty.
+        ax.yaxis.set_major_formatter(_plain_number_formatter())
+        if lo > 0 and hi / lo <= 12:
+            ax.yaxis.set_minor_formatter(_plain_number_formatter())
+    elif center_on_baseline:
+        top = max(float(heights.max()), 0.0)
+        bot = min(float(heights.min()), 0.0)
+        pad = 0.12 * (top - bot) if top > bot else 0.1
+        ax.set_ylim(bot - pad, top + pad)
+        # Keep tick labels on the true metric scale (add the offset back).
+        ax.yaxis.set_major_formatter(
+            mticker.FuncFormatter(lambda y, _pos, b=baseline: f"{y + b:.2f}")
+        )
+    else:
+        ax.set_ylim(0, vmax * linear_pad)
+
+    if center_on_baseline:
+        # Parity line (metric = 1): the y=0 axis baseline on a linear scale,
+        # y=1 in data space on a log scale.
+        ax.axhline(1.0 if log_scale else 0.0, color="black", linewidth=1.2)
+
+    if zoom is not None:
+        lo_v, hi_v = zoom
+        # Map a metric value to its plotted coordinate (linear-centered bars are
+        # drawn as value − 1; every other mode plots the value directly).
+        def _coord(v):
+            return v - 1.0 if (center_on_baseline and not log_scale) else v
+        y_lo, y_hi = _coord(lo_v), _coord(hi_v)
+        ax.set_ylim(y_lo, y_hi)
+        x_arr = np.asarray(x, dtype="float64")
+        for xi, v in zip(x_arr, values):
+            if not np.isfinite(v):
+                continue
+            if v > hi_v:
+                ax.annotate(
+                    f"{v:.2f}↑", (xi, y_hi), ha="center", va="top", rotation=90,
+                    fontsize=11, xytext=(0, -3), textcoords="offset points",
+                    clip_on=False, annotation_clip=False,
+                )
+            elif v < lo_v:
+                ax.annotate(
+                    f"{v:.2f}↓", (xi, y_lo), ha="center", va="bottom", rotation=90,
+                    fontsize=11, xytext=(0, 3), textcoords="offset points",
+                    clip_on=False, annotation_clip=False,
+                )
+
+    return bars
+
+
 # Season-average bar plots
 
 def plot_season_bars(
@@ -164,9 +315,18 @@ def plot_season_bars(
     inches_per_bar: float = 0.3,
     min_fig_width: float = 6.0,
     save_path: str | None = None,
-    legend_buffer: float = -0.7
+    legend_buffer: float = -0.7,
+    center_on_baseline: bool = False,
+    log_scale: bool = False,
 ) -> None:
-    
+    """
+    Two-panel season-average bar chart (mean log WIS and mean WIS).
+
+    center_on_baseline : re-base bars at metric = 1 so better-than-baseline
+        models point downward. These panels show *absolute* WIS, which has no
+        parity of 1, so this is off by default and only sensible if the summary's
+        metrics are relative. log_scale : put the y-axes on a log scale.
+    """
     n = len(summary)
     fig_width = max(min_fig_width, 9.0 if n <= 8 else n * inches_per_bar * 2.4)
     fig_height = min(6.0, max(6, 0.2 * n + 3.4))
@@ -186,20 +346,13 @@ def plot_season_bars(
         x = np.arange(len(s))
 
         bar_colours = [model_colours.get(m, "0.5") for m in s["model_id"]]
+        hatch_list = [(model_hatches or {}).get(m, "") for m in s["model_id"]]
 
-        bars = ax.bar(
-            x,
-            s[metric],
-            color=bar_colours,
-            width=bar_width,
-            align="center",
-            edgecolor="white",
-            linewidth=0.5,
+        bars = _draw_metric_bars(
+            ax, x, s[metric], bar_colours, hatch_list, bar_width,
+            center_on_baseline=center_on_baseline, log_scale=log_scale,
+            linear_pad=1.25,
         )
-
-        if model_hatches is not None:
-            for bar, model_id in zip(bars, s["model_id"]):
-                bar.set_hatch(model_hatches.get(model_id, ""))
 
         ax.set_xticks(x)
         ax.set_xticklabels(
@@ -213,7 +366,7 @@ def plot_season_bars(
             for bar, (_, row) in zip(bars, s.iterrows()):
                 ax.text(
                     bar.get_x() + bar.get_width() / 2,
-                    bar.get_height() + ypad,
+                    bar.get_y() + bar.get_height() + ypad,
                     f"n={row['n_tasks']:,}",
                     ha="center",
                     va="bottom",
@@ -221,7 +374,6 @@ def plot_season_bars(
 
         ax.set_ylabel(label)
         ax.set_title(f"Season-average {label}", pad=8)
-        ax.set_ylim(0, s[metric].max() * 1.25)
         ax.grid(True, axis="y", alpha=0.4)
         ax.set_axisbelow(True)
         ax.spines["top"].set_visible(False)
@@ -779,6 +931,8 @@ def plot_combined_season_bars(
     bar_width: float = 0.7,
     inches_per_bar: float = 0.25,
     save_path: str | None = None,
+    center_on_baseline: bool = False,
+    log_scale: bool = False,
 ) -> None:
     """
     Single-figure vertical bar comparison across Flu, COVID-19 and RSV.
@@ -786,6 +940,11 @@ def plot_combined_season_bars(
     Flu spans the full top row. COVID-19 and RSV are shown below, side by side,
     with width proportional to the number of models per infection. Models are
     sorted ascending by metric (lowest/best at left).
+
+    center_on_baseline : re-base bars at metric = 1 so better-than-baseline
+        models point downward. Only sensible when ``metric`` is a relative
+        (ratio) column; off by default since the default metric is absolute WIS.
+    log_scale : put the y-axes on a log scale (natural for a ratio metric).
 
     Parameters
     ----------
@@ -833,16 +992,13 @@ def plot_combined_season_bars(
         n = len(s)
         x = np.arange(n)
         colors = [colours.get(m, "0.5") for m in s["model_id"]]
+        hatch_list = [(hatches or {}).get(m, "") for m in s["model_id"]]
 
-        bars = ax.bar(
-            x, s[metric],
-            color=colors, width=bar_width, align="center",
-            edgecolor="white", linewidth=0.5,
+        _draw_metric_bars(
+            ax, x, s[metric], colors, hatch_list, bar_width,
+            center_on_baseline=center_on_baseline, log_scale=log_scale,
+            linear_pad=1.15,
         )
-
-        if hatches is not None:
-            for bar, model_id in zip(bars, s["model_id"]):
-                bar.set_hatch(hatches.get(model_id, ""))
 
         ax.set_xticks(x)
         _lbl_d = (model_labels or {}).get(d)
@@ -852,7 +1008,6 @@ def plot_combined_season_bars(
             rotation=45, ha="right",
         )
         ax.set_title(label, pad=5)
-        ax.set_ylim(0, s[metric].max() * 1.15)
         ax.grid(True, axis="y", alpha=0.4)
         ax.set_axisbelow(True)
         ax.spines["top"].set_visible(False)
@@ -903,13 +1058,26 @@ def plot_crosshub_rel_bars(
     inches_per_bar: float = 0.25,
     save_path: str | None = None,
     buffer: float = 0.0,
+    center_on_baseline: bool = True,
+    log_scale: bool = False,
+    zoom_ylim: tuple | None = None,
+    style: str = "bar",
+    marker_size: float = 150,
+    line_width: float = 3.6,
 ) -> None:
     """
-    Vertical bar chart of a relative WIS metric across three diseases.
+    Vertical bar (or lollipop) chart of a relative WIS metric across three diseases.
 
     Three side-by-side panels with width proportional to number of models per
-    disease. A horizontal dashed reference line marks relative WIS = 1 (parity
-    with baseline). Models are sorted ascending by metric (lowest/best at left).
+    disease. Models are sorted ascending by metric (lowest/best at left).
+
+    By default (``center_on_baseline=True``) the parity line (relative WIS = 1)
+    becomes the axis baseline: bars are drawn as ``metric − 1`` so models that
+    beat the baseline dip *below* the line, while worse ones rise above it. The
+    y-tick labels are kept on the familiar relative-WIS scale (< 1 = better) via
+    an offset formatter, so the numbers read normally even though the bars are
+    re-based. Set ``center_on_baseline=False`` to restore the previous version:
+    bars from 0 with a dashed reference line at 1.
 
     Parameters
     ----------
@@ -926,6 +1094,19 @@ def plot_crosshub_rel_bars(
                      Defaults to the order of summaries.keys().
     bar_width      : Fractional bar width within each column (0–1).
     inches_per_bar : Physical inches allocated per model column.
+    center_on_baseline : If True (default), re-base bars at relative WIS = 1 so
+                     better-than-baseline models point downward; if False, use
+                     the original 0-based bars with a dashed line at 1.
+    log_scale      : If True, put the y-axis on a log scale — the natural space
+                     for a ratio metric (a factor 2 better and 2 worse sit
+                     equidistant from parity). Composes with center_on_baseline.
+    zoom_ylim      : Optional (lo, hi) in relative-WIS units. Clips every panel's
+                     y-axis to this window for resolution near parity; models
+                     outside it are annotated with their value + an arrow.
+    style          : "bar" (default) or "lollipop" — same layout/limits/fonts,
+                     but lollipop draws a thin stem + dot instead of a filled bar
+                     (less ink for many models). marker_size / line_width size the
+                     dot and stem; marker shape encodes the hatch.
     """
     if diseases is None:
         diseases = list(summaries.keys())
@@ -964,21 +1145,20 @@ def plot_crosshub_rel_bars(
         hat = (hatches or {}).get(d, {})
 
         bar_colours = [col.get(m, "0.5") for m in df["model_id"]]
-        bars = ax.bar(
-            x, df[metric],
-            color=bar_colours, width=bar_width, align="center",
-            edgecolor="white", linewidth=0.5,
+        hatch_list = [hat.get(m, "") for m in df["model_id"]]
+
+        _draw_metric_bars(
+            ax, x, df[metric], bar_colours, hatch_list, bar_width,
+            center_on_baseline=center_on_baseline, log_scale=log_scale,
+            linear_pad=1.2, zoom=zoom_ylim,
+            style=style, marker_size=marker_size, line_width=line_width,
         )
 
-        for bar, m in zip(bars, df["model_id"]):
-            bar.set_hatch(hat.get(m, ""))
-        
-        if d in (d_0, d_1):
-            ax.set_ylabel(metric_label)
-        else:
-            ax.set_ylabel("")
+        # When not centering, keep the dashed parity reference at 1 (the helper
+        # draws a solid baseline itself only in the centered case).
+        if not center_on_baseline:
+            ax.axhline(1.0, color="black", linewidth=1.2, linestyle="--")
 
-        ax.axhline(1.0, color="black", linewidth=1.2, linestyle="--")
         ax.set_xticks(x)
         _lbl_d = (model_labels or {}).get(d)
         _lbl = _lbl_d if isinstance(_lbl_d, dict) else (model_labels or {})
@@ -986,9 +1166,8 @@ def plot_crosshub_rel_bars(
             [_lbl.get(m, m) for m in df["model_id"]],
             rotation=45, ha="right",
         )
-        ax.set_ylim(0, df[metric].max() * 1.2)
         ax.set_ylabel(metric_label)
-        ax.set_title(d)
+        ax.set_title(str(d).upper())
         ax.grid(True, axis="y", alpha=0.4)
         ax.set_axisbelow(True)
         ax.spines["top"].set_visible(False)
@@ -999,15 +1178,27 @@ def plot_crosshub_rel_bars(
         _all_hatches = {m: h for d_h in (hatches or {}).values() for m, h in d_h.items()}
         legend_entries = build_legend_entries(_all_colours, _all_hatches)
     if legend_entries:
-        handles = [
-            Patch(facecolor=fc, hatch=h, edgecolor="white", label=lbl)
-            for fc, h, lbl in legend_entries
-        ]
+        if style == "lollipop":
+            handles = [
+                Line2D(
+                    [], [], linestyle="none",
+                    marker=_HATCH_MARKER.get(h, "o"),
+                    markerfacecolor=fc, markeredgecolor="white", color=fc,
+                    markersize=13, label=lbl,
+                )
+                for fc, h, lbl in legend_entries
+            ]
+        else:
+            handles = [
+                Patch(facecolor=fc, hatch=h, edgecolor="white", label=lbl)
+                for fc, h, lbl in legend_entries
+            ]
         fig.legend(
             handles=handles,
             loc="lower center",
             ncol=min(len(handles), 3),
             bbox_to_anchor=(0.5, -0.05 - buffer),
+            handletextpad=0.6, columnspacing=1.6,
         )
 
     # fig.suptitle(title)
@@ -1454,7 +1645,7 @@ def plot_wis_decomposition(
 
     for ax, normalise, title in [
         (axA, False, r"$\bf{a}~~Absolute~contributions$"),
-        (axB, True, r"$\bf{b}~~Normalised~to~one$"),
+        (axB, True, r"$\bf{b}~~Normalized~to~one$"),
     ]:
         left = np.zeros(n_models)
         denom = agg["total"].to_numpy() if normalise else np.ones(n_models)
