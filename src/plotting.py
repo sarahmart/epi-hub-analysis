@@ -13,6 +13,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
 import matplotlib.dates as mdates
 import matplotlib.ticker as mticker
 import matplotlib.transforms as mtransforms
@@ -1595,9 +1596,9 @@ def plot_wis_decomposition(
     # Kept local so the function is self-contained (survives notebook autoreload
     # without a restart).
     component_style = {
-        "dispersion":      ("#9aa0a6", "dispersion (spread)"),
-        "overprediction":  ("#b5835a", "overprediction (forecast too high)"),
-        "underprediction": ("#5c8a9a", "underprediction (forecast too low)"),
+        "dispersion":      ("#9aa0a6", "Dispersion"),
+        "overprediction":  ("#b5835a", "Overprediction"),
+        "underprediction": ("#5c8a9a", "Underprediction"),
     }
     component_order = ["dispersion", "overprediction", "underprediction"]
 
@@ -1611,6 +1612,14 @@ def plot_wis_decomposition(
 
     def _label(m: str) -> str:
         return model_labels.get(m, m) if model_labels else m
+
+    def _contrast_text(hexcol: str) -> str:
+        # Black on light segments, white on dark, for legible in-bar labels.
+        r, g, b = mcolors.to_rgb(hexcol)
+        return "black" if (0.299 * r + 0.587 * g + 0.114 * b) > 0.6 else "white"
+
+    def _fmt_total(v: float) -> str:
+        return f"{v:,.1f}" if v >= 10 else f"{v:,.2f}"
 
     elig = scores[scores["model_id"].isin(eligible_models)]
     elig = elig[elig[comp_cols].notna().all(axis=1)]
@@ -1642,13 +1651,15 @@ def plot_wis_decomposition(
     )
 
     comps = [(k, component_style[k][0]) for k in component_order]
+    totals = agg["total"].to_numpy()
+    max_total = float(np.nanmax(totals)) if n_models else 1.0
 
     for ax, normalise, title in [
-        (axA, False, r"$\bf{a}~~Absolute~contributions$"),
-        (axB, True, r"$\bf{b}~~Normalized~to~one$"),
+        (axA, False, r"$\bf{a}~~Mean~WIS~by~component$"),
+        (axB, True, r"$\bf{b}~~Composition~of~mean~WIS$"),
     ]:
         left = np.zeros(n_models)
-        denom = agg["total"].to_numpy() if normalise else np.ones(n_models)
+        denom = totals if normalise else np.ones(n_models)
         denom = np.where(denom == 0, np.nan, denom)
         for name, color in comps:
             vals = agg[name].to_numpy() / denom
@@ -1656,11 +1667,25 @@ def plot_wis_decomposition(
                 y_pos, vals, left=left, color=color,
                 edgecolor="white", linewidth=0.5, height=0.75, zorder=2,
             )
+            if normalise:
+                # Percentage centred inside each segment wide enough to hold it.
+                txt_col = _contrast_text(color)
+                for yp, l, v in zip(y_pos, left, vals):
+                    if np.isfinite(v) and v >= 0.05:
+                        ax.text(l + v / 2, yp, f"{v:.0%}", ha="center", va="center",
+                                color=txt_col, fontsize=9, zorder=4)
             left += np.nan_to_num(vals)
         ax.set_title(title)  # size from plt.rcParams["axes.titlesize"]
         ax.xaxis.grid(True, alpha=0.3)
         ax.set_axisbelow(True)
 
+    # Total mean WIS at the end of each absolute (panel a) bar.
+    for yp, t in zip(y_pos, totals):
+        if np.isfinite(t):
+            axA.text(t + max_total * 0.012, yp, _fmt_total(t),
+                     ha="left", va="center", fontsize=9, color="0.25", zorder=4)
+
+    axA.set_xlim(0, max_total * 1.15)
     axA.set_xlabel("mean WIS contribution")
     axB.set_xlabel("share of mean WIS")
     axB.set_xlim(0, 1)
