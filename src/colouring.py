@@ -25,7 +25,8 @@ GOOGLE_PINK = SAI_ENSEMBLE   # main SAI hub submission; alias kept for notebook 
 HUB_BLACK   = HUB            # kept for notebook compatibility
 OTHER_GREY  = "#c0392b"
 
-HUB_HATCH = "//"             # hatch pattern for hub-generated models (ensembles / baselines)
+HUB_HATCH = "//"             # hatch pattern for hub ensembles
+HUB_BASELINE_HATCH = "xx"    # distinct hatch for hub baselines (vs ensembles)
 
 
 def median_gradient(col, cmap="RdYlGn_r"):
@@ -78,7 +79,8 @@ STYLE_LABELS: dict[tuple[str, str], str] = {
     (GOOGLE_INTERNAL, "//"): "Hybrid",
     (GOOGLE_INTERNAL, "x"):  "Novel",
     (HUB,             ""):   "Hub-submitted models",
-    (HUB,             "//"): "Hub ensemble / baseline",
+    (HUB,             "//"): "Hub ensemble",
+    (HUB,             "xx"): "Hub baseline",
     (OTHER_GREY,      ""):   "Other submitted models",
 }
 

@@ -21,7 +21,7 @@ from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from matplotlib.lines import Line2D
 from matplotlib.patches import Patch
 
-from src.colouring import GOOGLE_PINK, HUB_BLACK, build_legend_entries
+from src.colouring import GOOGLE_PINK, HUB_BLACK, SAI_ENSEMBLE, build_legend_entries
 
 # Shared style: subplot/panel heading size (ax.set_title inherits this unless a
 # call passes an explicit fontsize).
@@ -164,7 +164,7 @@ def _plain_number_formatter() -> "mticker.ScalarFormatter":
 
 # Marker shape stands in for the bar hatch when drawing lollipops (a dot can't be
 # hatched): solid → circle, // → square, x → triangle. Colour still encodes provenance.
-_HATCH_MARKER = {"": "o", "//": "s", "x": "^"}
+_HATCH_MARKER = {"": "o", "//": "s", "x": "^", "xx": "D"}
 
 
 def _draw_metric_bars(
@@ -1167,6 +1167,16 @@ def plot_crosshub_rel_bars(
             [_lbl.get(m, m) for m in df["model_id"]],
             rotation=45, ha="right",
         )
+        # Highlight the reference models on the x-axis: the pairwise baseline /
+        # ensemble (rel ≈ 1, often no visible bar when centered) is bolded, and
+        # the Google SAI ensemble is bolded + coloured to match its bar.
+        vals = df[metric].to_numpy()
+        for tl, c, v in zip(ax.get_xticklabels(), bar_colours, vals):
+            if c == SAI_ENSEMBLE:
+                tl.set_fontweight("bold")
+                tl.set_color(SAI_ENSEMBLE)
+            elif np.isfinite(v) and abs(v - 1.0) < 1e-6:
+                tl.set_fontweight("bold")
         ax.set_ylabel(metric_label)
         ax.set_title(str(d).upper())
         ax.grid(True, axis="y", alpha=0.4)
@@ -1178,6 +1188,33 @@ def plot_crosshub_rel_bars(
         _all_colours = {m: c for d_c in colours.values() for m, c in d_c.items()}
         _all_hatches = {m: h for d_h in (hatches or {}).values() for m, h in d_h.items()}
         legend_entries = build_legend_entries(_all_colours, _all_hatches)
+
+    # Drop legend entries whose (colour, hatch) style is present in the data but
+    # has no visible bar — e.g. the ensemble sits exactly at parity (rel = 1) so
+    # when centered it draws a zero-height bar. Styles absent from the data are
+    # left untouched (existing behaviour for categories with no models).
+    present_styles, visible_styles = set(), set()
+    for d in diseases:
+        _df = cleaned[d]
+        _col = colours.get(d, {})
+        _hat = (hatches or {}).get(d, {})
+        for m, v in zip(_df["model_id"], _df[metric].to_numpy()):
+            st = (_col.get(m, "0.5"), _hat.get(m, ""))
+            present_styles.add(st)
+            # Lollipops always draw a marker (even at rel = 1), so every style is
+            # visible; only bars go to zero height at parity and drop out.
+            if style == "lollipop":
+                vis = True
+            else:
+                vis = abs(v - 1.0) > 1e-9 if center_on_baseline else abs(v) > 1e-9
+            if vis:
+                visible_styles.add(st)
+    hidden_styles = present_styles - visible_styles
+    if legend_entries:
+        legend_entries = [
+            (fc, h, lbl) for fc, h, lbl in legend_entries if (fc, h) not in hidden_styles
+        ]
+
     if legend_entries:
         if style == "lollipop":
             handles = [
@@ -1197,7 +1234,7 @@ def plot_crosshub_rel_bars(
         fig.legend(
             handles=handles,
             loc="lower center",
-            ncol=min(len(handles), 3),
+            ncol=min(len(handles), 4),
             bbox_to_anchor=(0.5, -0.05 - buffer),
             handletextpad=0.6, columnspacing=1.6,
         )
