@@ -1587,6 +1587,7 @@ def plot_wis_decomposition(
     scores: pd.DataFrame,
     eligible_models: list[str],
     model_colours: dict,
+    metric: str = "log_wis",
     top_n: int = 15,
     main_model: str | None = None,
     hub_label: str = "",
@@ -1596,55 +1597,57 @@ def plot_wis_decomposition(
     save_path: str | None = None,
 ) -> None:
     """
-    Stacked-bar decomposition of mean WIS into dispersion, overprediction and
-    underprediction (Bracher et al. 2021), inspired by the scoringutils
-    decomposition figure (Bosse et al. 2024).
+    Stacked-bar decomposition of mean log WIS (or WIS) into dispersion,
+    overprediction and underprediction (Bracher et al. 2021), inspired by the
+    scoringutils decomposition figure (Bosse et al. 2024).
 
     Panel A shows absolute mean contributions (the three bars sum to the mean
-    WIS); panel B shows the same normalised to 1 (the calibration mix,
-    independent of overall magnitude). Models are ordered by mean WIS with the
-    best (lowest) at the top, matching ``plot_rank_distribution``.
+    score); panel B shows the same normalised to 1 (the calibration mix,
+    independent of overall magnitude). Models are ordered by mean score with the
+    best (lowest) at the top, matching ``plot_rank_distribution``. Bars stack
+    left-to-right as underprediction, dispersion, overprediction.
 
     "Overprediction" penalises forecasts that sit too high (truth below the
     interval); "underprediction" too low; "dispersion" rewards sharpness.
 
-    Requires the component columns ``wis_dispersion`` / ``wis_overprediction`` /
-    ``wis_underprediction`` produced by ``src.scoring``.
+    Requires the ``{metric}_dispersion`` / ``{metric}_overprediction`` /
+    ``{metric}_underprediction`` component columns from ``src.scoring`` (the
+    default log-WIS split needs ``log_wis_dispersion`` etc.).
 
     Parameters
     ----------
-    scores          : Scores DataFrame with wis_dispersion, wis_overprediction,
-                      wis_underprediction, wis and model_id columns.
+    scores          : Scores DataFrame with the {metric}_* component columns,
+                      wis and model_id columns.
     eligible_models : Model IDs to include.
     model_colours   : dict model_id → colour; used to highlight ``main_model``.
-    top_n           : Maximum number of models to display (best mean WIS).
+    metric          : "log_wis" (default) or "wis" — which score to decompose.
+    top_n           : Maximum number of models to display (best mean score).
     main_model      : Model ID to highlight with a bold, coloured y-label.
     hub_label       : Short hub name for the figure title.
     show_n_tasks    : If True, annotate each row with the model's task count.
     model_labels    : Optional dict model_id → display label.
     inches_per_row  : Figure height allocated per model row.
     """
-    # Component palette (colour, legend label) and left-to-right stacking order.
-    # Deliberately distinct from the model-provenance colours (hub red / Google
-    # blue) so components aren't confused with model identity. Over/under use a
-    # warm-vs-cool pair (tan = "too high", teal = "too low") that reads as a
-    # direction rather than a value judgement — avoiding green (implies "good")
-    # and the vivid orange/red/blue/purple already used elsewhere in the palette.
-    # Kept local so the function is self-contained (survives notebook autoreload
-    # without a restart).
     component_style = {
         "dispersion":      ("#9aa0a6", "Dispersion"),
         "overprediction":  ("#b5835a", "Overprediction"),
         "underprediction": ("#5c8a9a", "Underprediction"),
     }
-    component_order = ["dispersion", "overprediction", "underprediction"]
+    component_order = ["underprediction", "dispersion", "overprediction"]
 
-    comp_cols = ["wis_dispersion", "wis_overprediction", "wis_underprediction"]
-    missing = [c for c in comp_cols if c not in scores.columns]
+    if metric not in ("log_wis", "wis"):
+        raise ValueError(f"metric must be 'log_wis' or 'wis', got {metric!r}")
+    score_label = "log WIS" if metric == "log_wis" else "WIS"
+    comp_cols = {
+        "dispersion":      f"{metric}_dispersion",
+        "overprediction":  f"{metric}_overprediction",
+        "underprediction": f"{metric}_underprediction",
+    }
+    missing = [c for c in comp_cols.values() if c not in scores.columns]
     if missing:
         raise ValueError(
             f"plot_wis_decomposition requires columns {missing}; re-run "
-            "src.scoring to regenerate scores with the WIS components."
+            "src.scoring to regenerate scores with the (log) WIS components."
         )
 
     def _label(m: str) -> str:
@@ -1659,14 +1662,14 @@ def plot_wis_decomposition(
         return f"{v:,.1f}" if v >= 10 else f"{v:,.2f}"
 
     elig = scores[scores["model_id"].isin(eligible_models)]
-    elig = elig[elig[comp_cols].notna().all(axis=1)]
+    elig = elig[elig[list(comp_cols.values())].notna().all(axis=1)]
     if elig.empty:
         return
 
     agg = elig.groupby("model_id").agg(
-        dispersion=("wis_dispersion", "mean"),
-        overprediction=("wis_overprediction", "mean"),
-        underprediction=("wis_underprediction", "mean"),
+        dispersion=(comp_cols["dispersion"], "mean"),
+        overprediction=(comp_cols["overprediction"], "mean"),
+        underprediction=(comp_cols["underprediction"], "mean"),
         n_tasks=("wis", "size"),
     )
     agg["total"] = agg[["dispersion", "overprediction", "underprediction"]].sum(axis=1)
@@ -1691,9 +1694,10 @@ def plot_wis_decomposition(
     totals = agg["total"].to_numpy()
     max_total = float(np.nanmax(totals)) if n_models else 1.0
 
+    _score_tex = score_label.replace(" ", "~")
     for ax, normalise, title in [
-        (axA, False, r"$\bf{a}~~Mean~WIS~by~component$"),
-        (axB, True, r"$\bf{b}~~Composition~of~mean~WIS$"),
+        (axA, False, rf"$\bf{{a}}~~Mean~{_score_tex}~by~component$"),
+        (axB, True, rf"$\bf{{b}}~~Composition~of~mean~{_score_tex}$"),
     ]:
         left = np.zeros(n_models)
         denom = totals if normalise else np.ones(n_models)
@@ -1723,8 +1727,8 @@ def plot_wis_decomposition(
                      ha="left", va="center", fontsize=9, color="0.25", zorder=4)
 
     axA.set_xlim(0, max_total * 1.15)
-    axA.set_xlabel("mean WIS contribution")
-    axB.set_xlabel("share of mean WIS")
+    axA.set_xlabel(f"mean {score_label} contribution")
+    axB.set_xlabel(f"share of mean {score_label}")
     axB.set_xlim(0, 1)
 
     axA.set_yticks(y_pos)
@@ -1746,10 +1750,7 @@ def plot_wis_decomposition(
         Patch(facecolor=component_style[k][0], label=component_style[k][1])
         for k in component_order
     ]
-    # Reserve strips at top (suptitle) and bottom (legend) so neither collides
-    # with the axes, regardless of how many model rows are drawn.
-    # The bottom strip must hold the x-labels AND the legend below them; that
-    # needs a roughly fixed ~2.1 inches, so the fraction grows for short figures.
+
     bottom_frac = min(0.34, 2.1 / fig_height)
     fig.subplots_adjust(
         top=1.0 - 0.45 / fig_height,
@@ -1759,7 +1760,7 @@ def plot_wis_decomposition(
         right=0.94,
     )
     fig.legend(
-        handles=legend_handles, title="WIS component",
+        handles=legend_handles, title=f"{score_label} component",
         loc="upper center", ncol=3, frameon=True,
         bbox_to_anchor=(0.5, bottom_frac - 0.6 / fig_height),
     )

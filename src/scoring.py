@@ -127,8 +127,15 @@ def score_one_forecast(group: pd.DataFrame) -> pd.Series:
         else np.nan
     )
 
-    # ---- log WIS ----
-    log_wis = _wis(log_y, taus, log_qvals)
+    # ---- log WIS (same additive dispersion / over- / under-prediction split) ----
+    log_wis_dispersion, log_wis_overprediction, log_wis_underprediction = _wis_components(
+        log_y, taus, log_qvals
+    )
+    log_wis = (
+        log_wis_dispersion + log_wis_overprediction + log_wis_underprediction
+        if not np.isnan(log_wis_dispersion)
+        else np.nan
+    )
 
     # ---- Absolute error of median ----
     median = tau_to_q.get(0.5, np.nan)
@@ -154,6 +161,9 @@ def score_one_forecast(group: pd.DataFrame) -> pd.Series:
             "wis_overprediction": wis_overprediction,
             "wis_underprediction": wis_underprediction,
             "log_wis": log_wis,
+            "log_wis_dispersion": log_wis_dispersion,
+            "log_wis_overprediction": log_wis_overprediction,
+            "log_wis_underprediction": log_wis_underprediction,
             "cov_50": cov_50,
             "cov_95": cov_95,
         }
