@@ -1520,7 +1520,7 @@ def plot_rank_distribution(
         ax.plot(
             x_closed, y_closed,
             color=_main_color if is_main else "black",
-            lw=2.0 if is_main else 0.8,
+            lw=3.0 if is_main else 0.8,
             zorder=3 + int(is_main),
         )
 
