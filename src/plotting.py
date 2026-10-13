@@ -1326,9 +1326,9 @@ def plot_by_location(
         is_hub  = (m in hub_set)
         color   = _main_colour if is_main else model_colours.get(m, "0.5")
         marker  = "D" if is_main else ("s" if is_hub else "o")
-        size    = 55  if is_main else (30  if is_hub else 25)
+        size    = 72  if is_main else (44  if is_hub else 25)
         zorder  = 5   if is_main else (4   if is_hub else 2)
-        alpha   = 1.0 if (is_main or is_hub) else 0.65
+        alpha   = 1.0 if (is_main or is_hub) else 0.45
 
         valid = [
             (y_map[loc], sub.loc[m, loc])
@@ -1346,7 +1346,6 @@ def plot_by_location(
         )
 
     ax.set_xlabel("Mean log WIS")
-    ax.set_title("Mean log WIS by jurisdiction", pad=5)
     ax.grid(True, axis="x", alpha=0.3)
     ax.grid(False, axis="y")
     ax.tick_params(axis="y", length=0)
@@ -1376,10 +1375,15 @@ def plot_by_location(
     others = [m for m in top_eligible if m != main_model]
     if others:
         _oc = next((model_colours[m] for m in others if m in model_colours), "0.5")
+        _n_shown = min(top_n, len(others))
+        _others_label = (
+            "Eligible hub-submitting models" if _n_shown >= len(others)
+            else f"Top {_n_shown} eligible hub-submitting models"
+        )
         legend_handles.append(Line2D(
             [0], [0], marker="o", color="w", markerfacecolor=_oc,
             markersize=8, alpha=0.75,
-            label=f"Top {min(top_n, len(others))} eligible models",
+            label=_others_label,
         ))
 
     if legend_handles:
