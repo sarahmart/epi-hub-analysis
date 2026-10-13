@@ -28,6 +28,8 @@ OTHER_GREY  = "#c0392b"
 HUB_HATCH = "//"             # hatch pattern for hub ensembles
 HUB_BASELINE_HATCH = "xx"    # distinct hatch for hub baselines (vs ensembles)
 
+ENSEMBLE_STAR_MODELS: set = set() # models in Google SAI ensembles
+
 
 def median_gradient(col, cmap="RdYlGn_r"):
     """Per-column colour scale where the column median maps to the midpoint (yellow).
@@ -199,9 +201,30 @@ def model_type_style(s):
     return [f"color: {TYPE_COLOURS.get(v, 'black')}; font-weight: bold" for v in s]
 
 
+def texttt(name) -> str:
+    r"""Wrap a model name in ``\texttt`` for LaTeX monospace. A ``*`` ensemble
+    marker is kept upright and outside the monospace — either already present on
+    the name (internal tables) or added here when the name is in
+    ``ENSEMBLE_STAR_MODELS`` (per-disease tables). ``\allowbreak`` is inserted
+    after every ``-`` / ``_`` so long IDs wrap onto a second line (no hyphen)
+    when a column is too narrow, instead of overflowing.
+
+    Intended as a Styler ``.format`` / ``.format_index`` callable — it only
+    changes the displayed text, so colour ``.apply`` rules (which see the raw
+    value) still work. Any ``_`` inside is escaped later by the exporter.
+    (Note: the notebook preview will show the literal ``\texttt{...}``.)"""
+    s = str(name)
+    star = ""
+    if s.startswith("*"):
+        star, s = "*", s[1:]
+    elif s in ENSEMBLE_STAR_MODELS:
+        star = "*"
+    inner = s.replace("_", r"_\allowbreak{}").replace("-", r"-\allowbreak{}")
+    return star + r"\texttt{" + inner + "}"
+
+
 # REPLICA JUDGMENT column (internal hub tables) — expert verdict on whether a
-# Google replica followed the model's stated methodology. Categorical, shown as
-# colour-coded bold text; NA renders blank.
+# Google replica followed the model's stated methodology.
 JUDGMENT_COLOURS = {
     "Success":      "#227c49",  # green
     "Partial fail": "#c77f00",  # amber
