@@ -45,7 +45,7 @@ To run the FluSight analysis:
    - Summary tables printed in-notebook and exported as `.tex` files to `tables/`
 4. **Typical runtime:** approximately 2–4 minutes on a standard laptop.
 
-The same procedure applies to `covid_analysis.ipynb` and `rsv_analysis.ipynb` for COVID-19 and RSV analyses, and to `hub_season_analysis.ipynb` and `internal_hub_analysis.ipynb` for combined cross-hub analyses.
+The same procedure applies to `covid_analysis.ipynb` and `rsv_analysis.ipynb` for COVID-19 and RSV analyses. `hub_season_analysis.ipynb` generates forecast fan plots showing predicted distributions alongside observed values across the season for each disease. `internal_hub_analysis.ipynb` provides a combined three-pathogen analysis of the GoogleHub.
 
 Note: coloured tables do not render in GitHub's notebook preview but display correctly when run locally.
 
@@ -70,19 +70,19 @@ To regenerate all processed data and re-run the analysis from scratch for any of
 3. **Run the analysis notebook:**
    Open `<hub>_analysis.ipynb` and run all cells to generate all plots and tables.
 
-### Google Internal Hub
+### GoogleHub
 
 To run analysis for the [GoogleHub](https://github.com/google-research/google-research/tree/master/epi_forecasts) hosted on the Google Research public GitHub page (`google_covid`, `google_flu`, `google_rsv`):
 
-1. Load the corresponding CDC hub data first (the internal hubs reuse CDC ground truth, this step can be skipped if all above listed steps have already been run):
+1. Load the corresponding CDC hub data first (the GoogleHub analysis reuses CDC ground truth, this step can be skipped if all above listed steps have already been run):
    ```bash
    python -m src.load_hub --hub <hub> --incremental
    ```
-2. Load Google internal forecasts for each pathogen:
+2. Load GoogleHub forecasts for each pathogen:
    ```bash
    python -m src.load_hub --hub google_<hub> --incremental
    ```
-3. Score each internal hub:
+3. Score forecasts for each pathogen:
    ```bash
    python -m src.scoring --hub google_<hub>
    ```

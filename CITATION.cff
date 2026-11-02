@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite the accompanying paper."
+type: software
+title: "Epidemiological Forecast Hub Performance Analysis"
+repository-code: "https://github.com/sarahmart/epi-hub-analysis"
+license: Apache-2.0
+year: 2026
+authors:
+  - family-names: Martinson
+    given-names: Sarah
+  - family-names: Brenner
+    given-names: Michael P.
+  - family-names: Plomecka
+    given-names: Martyna
+  - family-names: Williams
+    given-names: Brian P.
+  - family-names: Reich
+    given-names: Nicholas G.
+  - family-names: Shamsi
+    given-names: Zahra
+preferred-citation:
+  type: article
+  title: "Prospective multi-pathogen disease forecasting using autonomous LLM-guided tree search"
+  authors:
+    - family-names: Martinson
+      given-names: Sarah
+    - family-names: Brenner
+      given-names: Michael P.
+    - family-names: Plomecka
+      given-names: Martyna
+    - family-names: Williams
+      given-names: Brian P.
+    - family-names: Reich
+      given-names: Nicholas G.
+    - family-names: Shamsi
+      given-names: Zahra
+  year: 2026
+  url: "https://arxiv.org/abs/2605.16238"
+  identifiers:
+    - type: other
+      value: "arXiv:2605.16238"
