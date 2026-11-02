@@ -1,5 +1,8 @@
 .claude
-__pycache__
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
 figures/pink
 figures/arxiv_version
 tables/
