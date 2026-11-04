@@ -1,0 +1,20 @@
+name,category,validation,test,selection_score,in_hub,in_ensemble
+UM-DeepOutbreak,Replica+Deep Research: COVID,34.5,26.2,86.9,True,True
+MOBS-GLEAM_COVID,Replica+Deep Research: COVID,35.1,27.8,90.7,True,True
+DeepResearch_CounterfactualSimulation,Last Season Search,35.9,27.9,91.7,True,True
+NEU_ISI-AdaptiveEnsemble,Replica+Deep Research: COVID,39.1,26.7,92.5,True,True
+UMass-gbqr,Replica+Deep Research: COVID,36.3,28.3,92.9,True,True
+OHT_JHU-nbxd,Replica+Deep Research: COVID,35.8,28.8,93.4,False,False
+CMU_TimeSeries-UMass_gbqr,Last Season Search,37.9,28.0,93.9,True,True
+CADPH-CovidCAT_Ensemble/early stopped/node 960,Replica+Deep Research: COVID,41.3,27.0,95.3,True,True
+DeepResearch_RegimeSwitchingDetection,Last Season Search,38.4,29.3,97.0,True,True
+CEPH_Rtrend_covid-CMU_climate_baseline,Last Season Search,37.4,30.2,97.8,True,True
+CMU_climate_baseline-UMass_ar6_pooled,Last Season Search,41.1,29.4,99.9,True,True
+UMass-ar6_pooled,Replica+Deep Research: COVID,41.1,30.5,102.1,True,False
+CFA-EpiAutoGP,Replica+Deep Research: COVID,43.4,30.3,104.0,True,False
+Metaculus-cp,Replica+Deep Research: COVID,42.0,31.1,104.2,True,False
+UGA_flucast-INFLAenza,Replica+Deep Research: COVID,55.1,30.9,116.9,True,False
+CMU-TimeSeries,Replica+Deep Research: COVID,55.7,30.8,117.3,True,False
+JHU_CSSE-CSSE_Ensemble,Replica+Deep Research: COVID,52.6,37.6,127.8,True,False
+CMU-climate_baseline,Replica+Deep Research: COVID,61.1,44.3,149.7,True,False
+CEPH-Rtrend_covid,Replica+Deep Research: COVID,50.2,116.7,283.6,True,False

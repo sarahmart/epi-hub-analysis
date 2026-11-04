@@ -1,0 +1,99 @@
+name,category,validation,test,selection_score,in_hub,in_ensemble
+Cornell_JHU-hierarchSIR,Replica: FluSight,72.5,41.0,154.5,True,True
+PSI-PROF_MOA,Replica: FluSight,69.9,47.2,164.3,True,True
+NU-PGF_FLUH,Replica: FluSight,78.4,49.5,177.4,True,False
+LANL_DBM,Replica: Paper,63.2,63.0,189.2,False,False
+NU-PGF_FLUH,Replica: FluSight,68.5,65.5,199.5,False,False
+"LANL_DBM Gemini3Flash, with packages, node 717",Unconstrained,73.4,48.5,170.4,True,False
+LANL_DBM_and_UMass_Flusion,Recombination,59.3,42.1,143.5,True,True
+LANL_DBM_and_LANL_Inferno,Recombination,63.1,42.2,147.5,True,True
+CU_SIRS_and_CMU_climate_baseline,Recombination,63.9,50.9,165.7,True,True
+CMU_climate_baseline_and_UGA_flucast_Copycat,Recombination,62.0,50.9,163.8,True,True
+CU_SIRS_and_UVA_Gaussian_processes,Recombination,59.9,45.4,150.7,True,True
+multi-layer-SE,Novel (DR/CS/other),60.7,52.6,165.9,True,True
+Time_Series_to_Vision_Transfer_Learning,Novel (DR/CS/other),63.47,59.26,181.99,True,False
+CMU_climate_baseline_and_UGuelph_CompositeCurve,Recombination,73.8,55.8,185.4,True,False
+CFA_Pyrenew_Pyrenew_H_Flu_and_UMass_Flusion,Recombination,64.5,46.0,156.5,False,False
+CU_SIRS_and_UGuelph_CompositeCurve,Recombination,58.3,49.8,157.9,False,False
+CMU_climate_baseline_and_LANL_DBM,Recombination,61.6,48.9,159.4,False,False
+CU_SIRS_and_UMass-gbqr,Recombination,65.7,48.3,162.3,False,False
+CFA_Pyrenew_Pyrenew_H_Flu_and_CMU_climate_baseline,Recombination,55.9,53.9,163.7,False,False
+Two_Stage_Classifier_Regression,Novel (DR/CS/other),69.1,47.9,164.9,False,False
+CMU_climate_baseline_and_CU_SIRS,Recombination,56.6,54.6,165.8,False,False
+CU_SIRS_and_UMass_KCDE,Recombination,60.6,53.4,167.4,False,False
+CU_SIRS_and_UGA_flucast-INFLAenza,Recombination,54.1,57.5,169.1,False,False
+PSI_PROF_and_UVA_Gaussian_processes,Recombination,68.4,50.4,169.2,False,False
+CU_SIRS_and_UGA_flucast_Copycat,Recombination,54.4,58.3,171.0,False,False
+CU_SIRS_and_UMass_Flusion,Recombination,63.5,53.8,171.1,False,False
+CFA_Pyrenew_Pyrenew_H_Flu_and_UMass_KCDE,Recombination,58.3,56.7,171.7,False,False
+PSI_PROF_and_CMU_climate_baseline,Recombination,44.7,63.7,172.1,False,False
+CMU_climate_baseline_and_CFA_Pyrenew_Pyrenew_H_Flu,Recombination,63.5,54.4,172.3,False,False
+UGA_flucast-INFLAenza,Replica: FluSight,51.4,51.8,155.0,True,True
+"NU-PGF_FLUH, gemini 3, early stopped node (838)",Replica: FluSight,64.8,44.7,154.2,True,True
+CU_SIRS,Replica: Paper,56.6,58.6,173.8,True,False
+"Cornell_JHU-hierarchSIR Gemini3Pro, with packages",Replica: FluSight,79.0,53.4,185.8,True,False
+"NU-PGF_FLUH, gemini 3",Replica: FluSight,53.4,68.9,191.2,False,False
+LANL_Inferno,Replica: Paper,64.5,78.2,220.9,False,False
+UMass_Flusion,Replica: FluSight,60.3,52.6,165.5,True,True
+"NU-PGF_FLUH Gemini3Pro, with packages, node 2027",Replica: FluSight,61.1,45.8,152.7,True,True
+UMass-gbqr,Replica: COVID,67.8,51.5,170.8,True,False
+"Cornell_JHU-hierarchSIR Gemini3Flash, with packages, node 2211",Replica: FluSight,73.23,50.9,175.03,True,False
+UGA_flucast_Copycat,Replica: FluSight,69.1,53.9,176.9,True,False
+CMU_timeseries,Replica: FluSight,65.9,55.8,177.5,True,False
+"NU-PGF_FLUH Gemini3Flash, with packages, node 321",Replica: FluSight,76.8,53.5,183.8,True,False
+UMass-ar6_pooled,Replica: COVID,70.6,57.3,185.2,True,False
+CFA_Pyrenew_Pyrenew_H_Flu,Replica: FluSight,73.9,56.0,185.9,True,False
+PSI_PROF,Replica: FluSight,84.8,56.3,197.4,True,False
+UGuelph_CompositeCurve,Replica: FluSight,81.3,59.7,200.7,True,False
+UVA_Gaussian_processes,Replica: Paper,80.3,69.6,219.5,True,False
+UMass_KCDE,Replica: Paper,80.5,72.0,224.5,True,False
+CMU_climate_baseline,Replica: COVID,89.4,79.1,247.6,True,False
+PSI-PROF_MOA,Replica: FluSight,129.9,148.6,427.1,True,False
+"Cornell_JHU-hierarchSIR, gemini3",Replica: FluSight,72.7,57.9,188.5,True,False
+"LANL_DBM, gemini 3",Replica: Paper,120.0,75.6,271.2,True,False
+unconstrained search,Novel (DR/CS/other),65.3,62.2,189.7,True,False
+NU-PGF_FLUH with packages,Replica: FluSight,74.7,48.0,170.7,False,False
+Cornell_JHU-hierarchSIR with packages,Replica: FluSight,86.3,56.3,198.9,False,False
+LANL_DBM with packages,Replica: Paper,224.3,128.3,480.9,False,False
+LANL_DBM_and_UGuelph_CompositeCurve,Recombination,60.2,46.0,152.2,False,False
+CMU_climate_baseline_and_UMass-ar6_pooled,Recombination,56.8,58.6,174.0,False,False
+LANL_DBM_and_CMU_timeseries,Recombination,60.3,57.0,174.3,False,False
+LANL_DBM_and_UGA_flucast_Copycat,Recombination,65.3,55.2,175.7,False,False
+CMU_climate_baseline_and_UVA_Gaussian_processes,Recombination,63.4,56.3,176.0,False,False
+CFA_Pyrenew_Pyrenew_H_Flu_and_UGuelph_CompositeCurve,Recombination,64.3,57.3,178.9,False,False
+PSI_PROF_and_UMass-gbqr,Recombination,67.9,55.9,179.7,False,False
+CFA_Pyrenew_Pyrenew_H_Flu_and_UGA_flucast_Copycat,Recombination,62.4,58.7,179.8,False,False
+DGP-SAD,Novel (DR/CS/other),76.2,52.0,180.2,False,False
+CFA_Pyrenew_Pyrenew_H_Flu_and_LANL_Inferno,Recombination,77.0,51.6,180.2,False,False
+PSI_PROF_and_UGA_flucast_Copycat,Recombination,63.5,58.9,181.3,False,False
+PSI_PROF_and_UGuelph_CompositeCurve,Recombination,75.0,53.4,181.8,False,False
+CU_SIRS_and_UMass-ar6_pooled,Recombination,53.7,64.4,182.5,False,False
+CMU_climate_baseline_and_UMass_KCDE,Recombination,58.7,61.9,182.5,False,False
+LANL_DBM_and_UMass_KCDE,Recombination,49.7,67.9,185.5,False,False
+PSI_PROF_and_UMass_KCDE,Recombination,58.4,63.7,185.8,False,False
+AETF,Novel (DR/CS/other),67.7,60.3,188.3,False,False
+LANL_DBM_and_UVA_Gaussian_processes,Recombination,60.6,63.9,188.4,False,False
+CMU_climate_baseline_and_PSI_PROF,Recombination,61.6,63.4,188.4,False,False
+PSI_PROF_and_LANL_Inferno,Recombination,74.4,58.1,190.6,False,False
+LANL_DBM_and_UMass-gbqr,Recombination,62.7,64.0,190.7,False,False
+epi-bridge,Novel (DR/CS/other),81.2,54.9,191.0,False,False
+CMU_climate_baseline_and_UMass-gbqr,Recombination,68.3,61.4,191.1,False,False
+CMU_climate_baseline_and_LANL_Inferno,Recombination,69.7,61.1,191.9,False,False
+CU_SIRS_and_CMU_timeseries,Recombination,67.1,62.7,192.5,False,False
+LANL_DBM_and_CMU_climate_baseline,Recombination,61.8,66.4,194.6,False,False
+neuro-mech-QSE,Novel (DR/CS/other),73.4,61.7,196.8,False,False
+PSI_PROF_and_UMass-ar6_pooled,Recombination,55.5,72.7,200.9,False,False
+CFA_Pyrenew_Pyrenew_H_Flu_and_UMass-ar6_pooled,Recombination,47.7,76.8,201.3,False,False
+PI-GTN,Novel (DR/CS/other),86.9,64.1,215.1,False,False
+CFA_Pyrenew_Pyrenew_H_Flu_and_CMU_timeseries,Recombination,86.4,64.6,215.6,False,False
+EpiSERA,Novel (DR/CS/other),81.4,68.0,217.4,False,False
+DERAS,Novel (DR/CS/other),78.2,72.3,222.8,False,False
+LANL_DBM_and_UMass-ar6_pooled,Recombination,64.0,83.3,230.6,False,False
+CFA_Pyrenew_Pyrenew_H_Flu_and_UGA_flucast-INFLAenza,Recombination,47.3,102.4,252.1,False,False
+PSI_PROF_and_CMU_timeseries,Recombination,102.5,86.0,274.5,False,False
+ASST-Flu,Novel (DR/CS/other),176.1,91.4,358.9,False,False
+PSI_PROF_and_UGA_flucast-INFLAenza,Recombination,55.4,161.0,377.4,False,False
+CFA_Pyrenew_Pyrenew_H_Flu_and_UVA_Gaussian_processes,Recombination,61.2,232.4,526.0,False,False
+GEPLABS,Novel (DR/CS/other),252.6,137.2,527.0,False,False
+CMU_climate_baseline_and_UGA_flucast-INFLAenza,Recombination,53.4,264.4,582.2,False,False
+CU_SIRS_and_LANL_Inferno,Recombination,55.2,15128.0,30311.2,False,False

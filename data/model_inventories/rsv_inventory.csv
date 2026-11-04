@@ -1,0 +1,17 @@
+name,category,validation,test,selection_score,in_hub,in_ensemble
+general_instruction_lgbm,Novel (Raw TS),23.2,2.5,28.2,True,True
+only COVID and Flu,Novel (Raw TS),21.7,3.2,28.1,True,True
+updated general instruction,Novel (Raw TS),24.9,3.1,31.1,False,False
+bsts_nowcasting,Novel (DR/CS/other),28.5,3.2,34.9,False,False
+CFA_Pyrenew-Pyrenew_E_RSV,Replica - RSVHub,27.5,3.3,34.1,False,False
+UGA_flucast-INFLAenza,Replica - RSVHub,27.4,3.5,34.4,False,False
+CFA_Pyrenew-Pyrenew_HE_RSV,Replica - RSVHub,27.6,3.6,34.8,False,False
+adversarial_domain_adapt,Novel (DR/CS/other),23.0,4.6,32.2,False,False
+multitask_shared_encoder,Novel (DR/CS/other),25.5,8.0,41.5,False,False
+bayesian_transfer_priors,Novel (DR/CS/other),57.6,8.9,75.4,False,False
+UM-DeepOutbreak,Replica - RSVHub,36.1,9.3,54.7,False,False
+CFA_Pyrenew-Pyrenew_H_RSV,Replica - RSVHub,94.1,10.3,114.7,False,False
+hybrid_mechanistic_ude,Novel (DR/CS/other),94.1,10.4,114.9,False,False
+deepar_cold_start,Novel (DR/CS/other),94.1,10.4,114.9,False,False
+CEPH-Rtrend_rsv,Replica - RSVHub,48.5,15.4,79.3,False,False
+nhits_hierarchical_interp,Novel (DR/CS/other),65.9,20.6,107.1,False,False
