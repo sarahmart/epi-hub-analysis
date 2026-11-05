@@ -8,8 +8,8 @@ Code for evaluating the performance of forecasting models submitted to the U.S. 
 
 1. Clone the repository:
    ```bash
-   git clone <repo-url>
-   cd performance-analysis
+   git clone https://github.com/sarahmart/epi-hub-analysis.git
+   cd epi-hub-analysis
    ```
 
 2. Create and activate a virtual environment:
